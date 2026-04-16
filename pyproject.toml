@@ -30,6 +30,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.ui" = ["templates/*.html"]
+"app" = ["static/**/*"]
 
 [project.scripts]
 gsctl = "app.cli:main"

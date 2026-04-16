@@ -55,17 +55,33 @@ maker-checker flows can be exercised:
 ./scripts/bootstrap.sh
 # or manually:
 pip install -e ".[dev]"
-gsctl init         # create tables
-gsctl seed         # load demo data (fund, investors, calls, distributions, NAV)
-gsctl summary      # print platform KPIs
+gsctl init                       # create tables
+gsctl seed                       # load demo data
+cd frontend && npm install && npm run build && cd ..    # build the SPA
 uvicorn app.main:app --reload
 ```
 
 Browse:
 
-- UI dashboard: <http://127.0.0.1:8000/ui/> (sign in as `admin`, `alice`, `bob`, `charlie`)
+- **React SPA**: <http://127.0.0.1:8000/app> — full interactive UI
+- Legacy Jinja UI: <http://127.0.0.1:8000/ui/>
 - OpenAPI docs: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/health>
+
+### Working on the SPA
+
+```bash
+# terminal 1: API
+uvicorn app.main:app --reload
+
+# terminal 2: Vite dev server with HMR + /api proxy
+cd frontend && npm run dev
+# → http://127.0.0.1:5173
+```
+
+Sign in with any known username (`dev-admin` auto-created on first start, or
+`admin`/`alice`/`bob`/`charlie` after `gsctl seed`). The SPA stores the
+identity in `localStorage` and attaches `X-User-Id` on every API call.
 
 Or with Docker:
 
@@ -91,9 +107,17 @@ app/
                   NAV, close, performance (IRR/TVPI/DPI), dashboards,
                   reconciliation, exports, jobs, migration, seed
   api/            REST routers (18, one per epic/sub-domain)
-  ui/             Jinja2 HTML dashboard & fund/investor/operations views
+  ui/             Jinja2 HTML (legacy, kept for /ui/)
+  spa.py          mounts the compiled React SPA from app/static/
   cli.py          gsctl command-line tool
-tests/            pytest suite
+frontend/         React + TypeScript + Vite SPA
+  src/api/        typed API client + endpoints
+  src/context/    AuthContext (X-User-Id header + localStorage)
+  src/components/ Layout, Kpi, StateBadge, ErrorBanner
+  src/pages/      Login, Dashboard, Funds, FundDetail, Investors,
+                  Transactions, CapitalCalls, Distributions, Periods,
+                  Operations, Audit
+tests/            pytest suite (29 tests)
 scripts/          bootstrap + ops helpers
 Dockerfile, docker-compose.yml
 ```

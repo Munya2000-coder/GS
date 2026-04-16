@@ -25,6 +25,7 @@ from app.api import (
 )
 from app.core.database import ensure_dev_admin, init_db
 from app.schemas.common import HealthResponse
+from app.spa import mount_spa
 from app.ui import routes as ui_routes
 
 
@@ -72,6 +73,8 @@ def create_app() -> FastAPI:
         exports.router, jobs.router, ui_routes.router,
     ):
         app.include_router(r)
+
+    mount_spa(app)
 
     return app
 
