@@ -13,9 +13,15 @@ from enum import StrEnum
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session
+
+
+# Surfaces "Authorize" button in Swagger UI; non-enforcing, the real check
+# lives in `current_user` below.
+api_key_scheme = APIKeyHeader(name="X-User-Id", auto_error=False)
 
 
 class Role(StrEnum):
@@ -77,7 +83,7 @@ class AuthUser:
 
 
 def current_user(
-    x_user_id: Annotated[str | None, Header(alias="X-User-Id")] = None,
+    x_user_id: Annotated[str | None, Depends(api_key_scheme)] = None,
     session: Session = Depends(get_session),
 ) -> AuthUser:
     from app.models.user import User

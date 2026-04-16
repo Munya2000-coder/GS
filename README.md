@@ -9,6 +9,46 @@ server-rendered HTML UI, background-job tracking, CSV exports, performance
 analytics, capital-call & distribution workflows, NAV management, period and
 close-calendar controls, and a CLI for administration.
 
+## Authentication
+
+This is a reference implementation — authentication is **header-based**
+(`X-User-Id: <username>`) and intended for development and demos. It is the
+single surface to replace when wiring real SSO/OIDC/SAML: swap
+`app.core.security.current_user` for your IdP integration and keep the rest of
+the permission and RBAC machinery unchanged.
+
+- **UI (Jinja2 templates at `/ui/`)**: real login page at `/ui/login`. Enter a
+  username, the server sets a `gs_user` cookie, and subsequent navigation is
+  authenticated for the session. `/ui/logout` clears the cookie.
+- **API**: every endpoint requires the `X-User-Id` header. In Swagger UI
+  (`/docs`) click **Authorize** and paste a username.
+- **curl**:
+
+  ```bash
+  curl -H "X-User-Id: dev-admin" http://127.0.0.1:8000/dashboards/platform
+  ```
+
+### Dev auto-provisioning
+
+When `ENVIRONMENT=development` (the default), startup auto-creates a
+`dev-admin` sys_admin user **only if the users table is empty**. This lets you
+hit any endpoint immediately after `gsctl init` without running the full seed.
+The username is logged at startup. In any other environment this behaviour
+is skipped and you must provision users explicitly via `/admin/users` or
+`gsctl seed`.
+
+### Seed users
+
+`gsctl seed` creates four users with different permission scopes so
+maker-checker flows can be exercised:
+
+| Username  | Roles                                   |
+|-----------|-----------------------------------------|
+| `admin`   | sys_admin, fund_controller, fund_accountant |
+| `alice`   | fund_accountant, ops_analyst            |
+| `bob`     | fund_controller                         |
+| `charlie` | investor_relations                      |
+
 ## Quickstart
 
 ```bash

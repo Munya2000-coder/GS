@@ -30,3 +30,25 @@ def init_db() -> None:
 
     register_models()
     Base.metadata.create_all(bind=engine)
+
+
+def ensure_dev_admin() -> str | None:
+    """In development, provision a `dev-admin` sys_admin user if no users
+    exist. Returns the username created, or None if skipped."""
+    settings = get_settings()
+    if settings.environment != "development":
+        return None
+    from app.models.user import User
+
+    with SessionLocal() as s:
+        if s.query(User).count() > 0:
+            return None
+        user = User(
+            username="dev-admin",
+            display_name="Development Admin",
+            email="dev-admin@example.local",
+        )
+        user.set_roles(["sys_admin"])
+        s.add(user)
+        s.commit()
+        return user.username

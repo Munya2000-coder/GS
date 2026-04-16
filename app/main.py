@@ -23,7 +23,7 @@ from app.api import (
     transactions,
     waterfall,
 )
-from app.core.database import init_db
+from app.core.database import ensure_dev_admin, init_db
 from app.schemas.common import HealthResponse
 from app.ui import routes as ui_routes
 
@@ -31,6 +31,14 @@ from app.ui import routes as ui_routes
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    created = ensure_dev_admin()
+    if created:
+        import logging
+        logging.getLogger("uvicorn").warning(
+            "[dev] auto-provisioned sys_admin user %r — log in at /ui/login "
+            "or pass header: X-User-Id: %s",
+            created, created,
+        )
     yield
 
 
@@ -38,7 +46,16 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="GS Private Capital Suite",
         version=__version__,
-        description="Private capital operations platform: fund accounting, fees, carry, reporting, audit.",
+        description=(
+            "Private capital operations platform: fund accounting, fees, carry, "
+            "reporting, audit.\n\n"
+            "**Authentication (dev):** all endpoints require the `X-User-Id` "
+            "header. Click **Authorize** and enter a username such as "
+            "`dev-admin` (auto-created in development) or one of the seeded "
+            "users `admin` / `alice` / `bob` / `charlie` after running "
+            "`gsctl seed`. In production replace the `current_user` dependency "
+            "with an SSO/OIDC integration."
+        ),
         lifespan=lifespan,
     )
 
