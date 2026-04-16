@@ -1,17 +1,32 @@
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gs
+      POSTGRES_PASSWORD: gs
+      POSTGRES_DB: gs_capital
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "gs"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - gs-pgdata:/var/lib/postgresql/data
+
   api:
     build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://gs:gs@db:5432/gs_capital
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY must be set}
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: '["https://example.com"]'
+      GUNICORN_WORKERS: "4"
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: sqlite:////data/gs.db
-      ENVIRONMENT: development
-    volumes:
-      - gs-data:/data
-    command: >
-      sh -c "gsctl init &&
-             gsctl seed &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
 volumes:
-  gs-data:
+  gs-pgdata:

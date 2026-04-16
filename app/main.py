@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
@@ -23,19 +24,28 @@ from app.api import (
     transactions,
     waterfall,
 )
+from app.core.config import get_settings
 from app.core.database import ensure_dev_admin, init_db
+from app.core.observability import (
+    RequestIdMiddleware,
+    SecurityHeadersMiddleware,
+    configure_logging,
+    install_error_handlers,
+)
 from app.schemas.common import HealthResponse
 from app.spa import mount_spa
 from app.ui import routes as ui_routes
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
+    settings = get_settings()
+    configure_logging(settings.log_level)
     init_db()
     created = ensure_dev_admin()
     if created:
         import logging
-        logging.getLogger("uvicorn").warning(
+        logging.getLogger("gs").warning(
             "[dev] auto-provisioned sys_admin user %r — log in at /ui/login "
             "or pass header: X-User-Id: %s",
             created, created,
@@ -44,6 +54,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
     app = FastAPI(
         title="GS Private Capital Suite",
         version=__version__,
@@ -60,9 +71,30 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    app.add_middleware(RequestIdMiddleware)
+    if settings.enable_security_headers:
+        app.add_middleware(SecurityHeadersMiddleware)
+    install_error_handlers(app)
+
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
         return HealthResponse(status="ok", version=__version__)
+
+    @app.get("/readyz", tags=["health"])
+    def readyz():
+        """Readiness probe: verifies DB connectivity."""
+        from sqlalchemy import text
+
+        from app.core.database import engine
+
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {
+            "status": "ready",
+            "version": __version__,
+            "environment": settings.environment,
+            "ts": datetime.now(timezone.utc).isoformat(),
+        }
 
     for r in (
         entities.router, investors.router, transactions.router,

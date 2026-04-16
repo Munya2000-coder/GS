@@ -189,3 +189,148 @@ export interface AuditEvent {
   after: string | null;
   privileged: boolean;
 }
+
+export interface FeeSchedule {
+  id: number;
+  entity_id: number;
+  investor_id: number | null;
+  investor_class: string | null;
+  name: string;
+  basis: "commitment" | "invested_capital" | "nav" | "flat";
+  annual_rate_bps: number;
+  effective_from: string;
+  effective_to: string | null;
+  version: number;
+  state: string;
+}
+
+export interface FeeAccrual {
+  id: number;
+  schedule_id: number;
+  investor_id: number | null;
+  basis_amount: string;
+  applied_rate_bps: number;
+  gross_fee: string;
+  offset_amount: string;
+  net_fee: string;
+}
+
+export interface FeeRun {
+  id: number;
+  entity_id: number;
+  period_start: string;
+  period_end: string;
+  state: string;
+  input_snapshot_hash: string;
+  accruals: FeeAccrual[];
+}
+
+export interface WaterfallModel {
+  id: number;
+  entity_id: number;
+  investor_class: string | null;
+  name: string;
+  method: "american" | "european" | "hybrid";
+  preferred_return_bps: number;
+  catchup_percentage_bps: number;
+  carried_interest_bps: number;
+  hurdle_compounding: string;
+  effective_from: string;
+  effective_to: string | null;
+  version: number;
+  state: string;
+}
+
+export interface WaterfallTier {
+  tier_order: number;
+  tier_name: string;
+  lp_amount: string;
+  gp_amount: string;
+  formula_text: string;
+}
+
+export interface WaterfallRun {
+  id: number;
+  model_id: number;
+  entity_id: number;
+  as_of_date: string;
+  scenario_label: string | null;
+  is_scenario: boolean;
+  state: string;
+  input_snapshot_hash: string;
+  tiers: WaterfallTier[];
+}
+
+export interface NavSnapshot {
+  id: number;
+  entity_id: number;
+  investor_id: number | null;
+  as_of: string;
+  gross_asset_value: string;
+  liabilities: string;
+  ending_nav: string;
+  currency: string;
+  source_reference: string | null;
+}
+
+export interface UserRecord {
+  id: number;
+  username: string;
+  display_name: string;
+  email: string;
+  roles: string[];
+  fund_scope: number[] | null;
+  active: boolean;
+  mfa_enabled: boolean;
+}
+
+export interface Me {
+  id: number;
+  username: string;
+  roles: string[];
+  fund_scope: number[] | null;
+  permissions: string[];
+}
+
+export interface TrialBalanceRow {
+  account_code: string;
+  account_name: string;
+  debit: string;
+  credit: string;
+  net: string;
+}
+
+export interface TrialBalance {
+  entity_id: number;
+  as_of: string;
+  rows: TrialBalanceRow[];
+}
+
+export interface CapitalAccountStatement {
+  investor: { id: number; code: string; legal_name: string };
+  entity: { id: number; code: string; legal_name: string };
+  as_of: string;
+  commitment: string;
+  contributed: string;
+  distributed: string;
+  ending_nav: string;
+  unfunded: string;
+  allocated_pnl: string;
+  transactions: Array<{
+    id: number;
+    date: string;
+    type: string;
+    amount: string;
+    currency: string;
+    description: string | null;
+    source_reference: string;
+  }>;
+}
+
+export interface ImportResult {
+  batch_id: number;
+  accepted: number;
+  rejected: number;
+  transaction_ids: number[];
+  exception_ids: number[];
+}

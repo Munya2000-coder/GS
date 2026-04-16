@@ -18,11 +18,12 @@ SPA_DIR = Path(__file__).parent / "static"
 
 
 def mount_spa(app: FastAPI) -> None:
-    # Dev mode: Vite's dev server runs on :5173 and proxies /api to :8000.
-    # Allow CORS so the SPA can call the API directly while iterating.
+    from app.core.config import get_settings
+
+    settings = get_settings()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_origins=settings.cors_origins,
         allow_methods=["*"],
         allow_headers=["*"],
         allow_credentials=True,

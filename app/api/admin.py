@@ -3,11 +3,30 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session
-from app.core.security import AuthUser, Permission, Role, require_permission
+from app.core.security import (
+    ROLE_PERMISSIONS,
+    AuthUser,
+    Permission,
+    Role,
+    current_user,
+    require_permission,
+)
 from app.models.user import User
 from app.services import audit
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/me")
+def whoami(user: AuthUser = Depends(current_user)):
+    perms = sorted({p.value for r in user.roles for p in ROLE_PERMISSIONS.get(r, set())})
+    return {
+        "id": user.id,
+        "username": user.username,
+        "roles": sorted(r.value for r in user.roles),
+        "fund_scope": sorted(user.fund_scope) if user.fund_scope else None,
+        "permissions": perms,
+    }
 
 
 class UserCreate(BaseModel):

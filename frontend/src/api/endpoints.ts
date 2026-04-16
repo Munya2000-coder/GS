@@ -3,17 +3,27 @@ import type {
   AccountingPeriod,
   AuditEvent,
   CapitalAccount,
+  CapitalAccountStatement,
   CapitalCall,
   Commitment,
   Distribution,
   Entity,
+  FeeRun,
+  FeeSchedule,
   FundSummary,
+  ImportResult,
   Investor,
   Job,
+  Me,
+  NavSnapshot,
   OperationsDashboard,
   PerformanceMetrics,
   PlatformSummary,
   Transaction,
+  TrialBalance,
+  UserRecord,
+  WaterfallModel,
+  WaterfallRun,
 } from "./types";
 
 export const Platform = {
@@ -26,13 +36,13 @@ export const Platform = {
 export const Entities = {
   list: () => api.get<Entity[]>("/entities").then((r) => r.data),
   get: (id: number) => api.get<Entity>(`/entities/${id}`).then((r) => r.data),
-  create: (payload: Partial<Entity>) => api.post<Entity>("/entities", payload).then((r) => r.data),
+  create: (payload: Record<string, unknown>) => api.post<Entity>("/entities", payload).then((r) => r.data),
 };
 
 export const Investors = {
   list: () => api.get<Investor[]>("/investors").then((r) => r.data),
   get: (id: number) => api.get<Investor>(`/investors/${id}`).then((r) => r.data),
-  create: (payload: Partial<Investor>) => api.post<Investor>("/investors", payload).then((r) => r.data),
+  create: (payload: Record<string, unknown>) => api.post<Investor>("/investors", payload).then((r) => r.data),
   commitments: (investorId: number) =>
     api.get<Commitment[]>(`/investors/${investorId}/commitments`).then((r) => r.data),
   capitalAccounts: (investorId: number) =>
@@ -99,4 +109,88 @@ export const Audit = {
     api.get("/audit/lineage/upstream", { params: { object_type: objectType, object_id: objectId } }).then((r) => r.data),
   downstream: (objectType: string, objectId: string) =>
     api.get("/audit/lineage/downstream", { params: { object_type: objectType, object_id: objectId } }).then((r) => r.data),
+};
+
+export const Fees = {
+  schedules: (entityId?: number) =>
+    api.get<FeeSchedule[]>("/fees/schedules", { params: { entity_id: entityId } }).then((r) => r.data),
+  createSchedule: (payload: object) => api.post<FeeSchedule>("/fees/schedules", payload).then((r) => r.data),
+  approveSchedule: (id: number) =>
+    api.post<FeeSchedule>(`/fees/schedules/${id}/approve`).then((r) => r.data),
+  run: (payload: { entity_id: number; period_start: string; period_end: string }) =>
+    api.post<FeeRun>("/fees/run", payload).then((r) => r.data),
+};
+
+export const Waterfall = {
+  listModels: (entityId?: number) =>
+    api.get<WaterfallModel[]>("/waterfall/models", { params: { entity_id: entityId } }).then((r) => r.data),
+  createModel: (payload: object) => api.post<WaterfallModel>("/waterfall/models", payload).then((r) => r.data),
+  approveModel: (id: number) =>
+    api.post<WaterfallModel>(`/waterfall/models/${id}/approve`).then((r) => r.data),
+  run: (payload: {
+    model_id: number;
+    as_of: string;
+    scenario_label?: string | null;
+    is_scenario?: boolean;
+  }) => api.post<WaterfallRun>("/waterfall/run", payload).then((r) => r.data),
+  approveRun: (id: number) => api.post<WaterfallRun>(`/waterfall/runs/${id}/approve`).then((r) => r.data),
+};
+
+export const Nav = {
+  list: (entityId: number) =>
+    api.get<NavSnapshot[]>("/nav", { params: { entity_id: entityId } }).then((r) => r.data),
+  publish: (payload: object) => api.post<NavSnapshot>("/nav", payload).then((r) => r.data),
+};
+
+export const Admin = {
+  me: () => api.get<Me>("/admin/me").then((r) => r.data),
+  listUsers: () => api.get<UserRecord[]>("/admin/users").then((r) => r.data),
+  createUser: (payload: object) => api.post<UserRecord>("/admin/users", payload).then((r) => r.data),
+  deactivate: (id: number) => api.post<UserRecord>(`/admin/users/${id}/deactivate`).then((r) => r.data),
+};
+
+export const Reports = {
+  trialBalance: (entityId: number, asOf: string) =>
+    api.get<TrialBalance>("/reports/trial-balance", {
+      params: { entity_id: entityId, as_of: asOf },
+    }).then((r) => r.data),
+  capitalAccount: (investorId: number, entityId: number, asOf: string) =>
+    api.get<CapitalAccountStatement>("/reports/capital-account", {
+      params: { investor_id: investorId, entity_id: entityId, as_of: asOf },
+    }).then((r) => r.data),
+  contribDistrib: (entityId: number, asOf: string, investorId?: number) =>
+    api.get("/reports/contrib-distrib", {
+      params: { entity_id: entityId, as_of: asOf, investor_id: investorId },
+    }).then((r) => r.data),
+};
+
+export const Reconciliation = {
+  reconcileBatch: (payload: {
+    batch_id: number;
+    expected_count: number;
+    expected_total: string;
+  }) => api.post("/reconciliation/batch", payload).then((r) => r.data),
+  assignException: (exceptionId: number, payload: { owner_user_id: number; note: string }) =>
+    api.post(`/reconciliation/exceptions/${exceptionId}/assign`, payload).then((r) => r.data),
+  listExceptions: (batchId: number) =>
+    api.get<Array<{
+      id: number;
+      row_number: number;
+      code: string;
+      message: string;
+      status: string;
+      owner_user_id: number | null;
+      remediation_note: string | null;
+    }>>(`/transactions/batches/${batchId}/exceptions`).then((r) => r.data),
+};
+
+export const TransactionImport = {
+  run: (payload: {
+    source_system: string;
+    source_owner: string;
+    mapping_version: string;
+    file_name?: string;
+    records: Record<string, unknown>[];
+  }) => api.post<ImportResult>("/transactions/import", payload).then((r) => r.data),
+  template: () => api.get("/integrations/templates/transactions").then((r) => r.data),
 };

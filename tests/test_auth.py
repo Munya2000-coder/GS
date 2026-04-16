@@ -22,6 +22,7 @@ def test_ensure_dev_admin_creates_when_empty(monkeypatch):
 
 def test_ensure_dev_admin_skips_in_non_dev(monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("SECRET_KEY", "a-properly-set-production-secret-value")
     from app.core import config
     config.get_settings.cache_clear()
 

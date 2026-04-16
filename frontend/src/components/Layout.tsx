@@ -10,14 +10,26 @@ export default function Layout() {
         <div className="brand">GS · Private Capital</div>
         <nav>
           <NavLink to="/" end>Dashboard</NavLink>
+          <div className="sidebar-section">Structure</div>
           <NavLink to="/funds">Funds</NavLink>
           <NavLink to="/investors">Investors</NavLink>
+          <div className="sidebar-section">Operations</div>
           <NavLink to="/transactions">Transactions</NavLink>
+          <NavLink to="/transactions/import">Import</NavLink>
           <NavLink to="/capital-calls">Capital Calls</NavLink>
           <NavLink to="/distributions">Distributions</NavLink>
+          <NavLink to="/nav">NAV</NavLink>
+          <div className="sidebar-section">Accounting</div>
+          <NavLink to="/fees">Fees</NavLink>
+          <NavLink to="/waterfall">Waterfall</NavLink>
           <NavLink to="/periods">Periods</NavLink>
+          <NavLink to="/reconciliation">Reconciliation</NavLink>
+          <div className="sidebar-section">Reporting</div>
+          <NavLink to="/reports">Reports</NavLink>
           <NavLink to="/operations">Operations</NavLink>
           <NavLink to="/audit">Audit</NavLink>
+          <div className="sidebar-section">System</div>
+          <NavLink to="/admin">Admin</NavLink>
         </nav>
       </aside>
 

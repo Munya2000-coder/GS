@@ -12,6 +12,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "email-validator>=2.1",
     "jinja2>=3.1",
+    "alembic>=1.13",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,10 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "httpx>=0.26",
+]
+prod = [
+    "gunicorn>=22.0",
+    "psycopg[binary]>=3.2",
 ]
 
 [build-system]
