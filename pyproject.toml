@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.1",
     "python-multipart>=0.0.9",
     "email-validator>=2.1",
+    "jinja2>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,12 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.ui" = ["templates/*.html"]
+
+[project.scripts]
+gsctl = "app.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

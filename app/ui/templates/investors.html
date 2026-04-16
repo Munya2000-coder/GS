@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Investors</h1>
+<div class="card">
+<table>
+    <thead>
+        <tr>
+            <th>Code</th><th>Legal Name</th><th>Domicile</th>
+            <th>Classification</th><th>Side-letter</th><th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for i in investors %}
+        <tr>
+            <td>{{ i.code }}</td>
+            <td>{{ i.legal_name }}</td>
+            <td>{{ i.domicile }}</td>
+            <td>{{ i.tax_classification or "—" }}</td>
+            <td>
+                {% if i.side_letter %}
+                    <span class="badge warn">yes</span>
+                {% else %}
+                    <span class="badge muted">no</span>
+                {% endif %}
+            </td>
+            <td><span class="badge {% if i.status.value == 'active' %}ok{% else %}muted{% endif %}">{{ i.status.value }}</span></td>
+        </tr>
+    {% endfor %}
+    {% if not investors %}<tr><td colspan="6"><em>No investors yet.</em></td></tr>{% endif %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

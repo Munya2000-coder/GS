@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: sqlite:////data/gs.db
+      ENVIRONMENT: development
+    volumes:
+      - gs-data:/data
+    command: >
+      sh -c "gsctl init &&
+             gsctl seed &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+volumes:
+  gs-data:

@@ -43,6 +43,14 @@ def list_investors(session: Session = Depends(get_session), _: AuthUser = Depend
     return session.query(Investor).order_by(Investor.code).all()
 
 
+@router.get("/{investor_id}", response_model=InvestorOut)
+def get_investor(investor_id: int, session: Session = Depends(get_session), _: AuthUser = Depends(require_permission(Permission.READ))):
+    inv = session.get(Investor, investor_id)
+    if not inv:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "investor not found")
+    return inv
+
+
 @router.post("/commitments", response_model=CommitmentOut, status_code=201)
 def add_commitment(
     payload: CommitmentCreate,

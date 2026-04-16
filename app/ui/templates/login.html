@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Sign in · GS Private Capital Suite{% endblock %}
+{% block content %}
+<h1>Sign in</h1>
+<div class="card" style="max-width: 400px;">
+    <form method="post" action="/ui/login">
+        <p>Enter a username to authenticate. In development, seed users are
+           <code>admin</code>, <code>alice</code>, <code>bob</code>, <code>charlie</code>.</p>
+        <p><input type="text" name="username" placeholder="username" required autofocus /></p>
+        <p><button class="btn" type="submit">Sign in</button></p>
+    </form>
+</div>
+{% endblock %}
