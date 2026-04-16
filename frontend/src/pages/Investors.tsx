@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { Investors } from "../api/endpoints";
 import { extractError } from "../api/client";
 import ErrorBanner from "../components/ErrorBanner";
@@ -119,7 +120,7 @@ export default function InvestorsPage() {
             <tbody>
               {(data ?? []).map((i) => (
                 <tr key={i.id}>
-                  <td className="mono">{i.code}</td>
+                  <td className="mono"><Link to={`/investors/${i.id}`}>{i.code}</Link></td>
                   <td>{i.legal_name}</td>
                   <td>{i.domicile}</td>
                   <td className="muted">{i.primary_email ?? "—"}</td>

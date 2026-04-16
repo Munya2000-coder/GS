@@ -9,6 +9,7 @@ import DistributionsPage from "./pages/Distributions";
 import FeesPage from "./pages/Fees";
 import FundDetailPage from "./pages/FundDetail";
 import FundsPage from "./pages/Funds";
+import InvestorDetailPage from "./pages/InvestorDetail";
 import InvestorsPage from "./pages/Investors";
 import LoginPage from "./pages/Login";
 import NavPage from "./pages/Nav";
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="funds" element={<FundsPage />} />
         <Route path="funds/:id" element={<FundDetailPage />} />
         <Route path="investors" element={<InvestorsPage />} />
+        <Route path="investors/:id" element={<InvestorDetailPage />} />
         <Route path="transactions" element={<TransactionsPage />} />
         <Route path="transactions/import" element={<TransactionImportPage />} />
         <Route path="capital-calls" element={<CapitalCallsPage />} />

@@ -9,6 +9,5 @@ venv/
 build/
 dist/
 .DS_Store
-app/static/
 frontend/node_modules/
 frontend/dist/

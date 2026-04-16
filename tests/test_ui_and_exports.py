@@ -1,33 +1,17 @@
 from tests.conftest import auth_headers
 
 
-def test_login_then_dashboards_render(client):
-    r = client.get("/ui/login")
-    assert r.status_code == 200
-    assert "Sign in" in r.text
-
-    r = client.post("/ui/login", data={"username": "admin"}, follow_redirects=False)
-    assert r.status_code == 302
-    assert r.cookies.get("gs_user") == "admin"
-
-    r = client.get("/ui/", cookies={"gs_user": "admin"})
-    assert r.status_code == 200
-    assert "Platform Overview" in r.text
-
-    r = client.get("/ui/funds", cookies={"gs_user": "admin"})
-    assert r.status_code == 200
-
-    r = client.get("/ui/investors", cookies={"gs_user": "admin"})
-    assert r.status_code == 200
-
-    r = client.get("/ui/operations", cookies={"gs_user": "admin"})
-    assert r.status_code == 200
-
-
-def test_ui_redirects_when_not_signed_in(client):
-    r = client.get("/ui/", follow_redirects=False)
+def test_root_redirects_to_spa(client):
+    r = client.get("/", follow_redirects=False)
     assert r.status_code in (302, 307)
-    assert "/ui/login" in r.headers.get("location", "")
+    assert r.headers["location"].startswith("/app")
+
+
+def test_legacy_ui_paths_redirect_to_spa(client):
+    for path in ["/ui", "/ui/", "/ui/login", "/ui/funds", "/ui/anything"]:
+        r = client.get(path, follow_redirects=False)
+        assert r.status_code in (302, 307), f"{path} did not redirect"
+        assert r.headers["location"].startswith("/app")
 
 
 def test_csv_export_of_transactions(client):

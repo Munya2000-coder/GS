@@ -158,6 +158,17 @@ export interface AccountingPeriod {
   reopen_reason: string | null;
 }
 
+export interface CloseStep {
+  id: number;
+  period_id: number;
+  name: string;
+  owner_user_id: number | null;
+  due_date: string | null;
+  depends_on_step_id: number | null;
+  status: string;
+  signed_off_by_user_id: number | null;
+}
+
 export interface Job {
   id: number;
   job_type: string;

@@ -5,6 +5,7 @@ import type {
   CapitalAccount,
   CapitalAccountStatement,
   CapitalCall,
+  CloseStep,
   Commitment,
   Distribution,
   Entity,
@@ -47,6 +48,10 @@ export const Investors = {
     api.get<Commitment[]>(`/investors/${investorId}/commitments`).then((r) => r.data),
   capitalAccounts: (investorId: number) =>
     api.get<CapitalAccount[]>(`/investors/${investorId}/capital-accounts`).then((r) => r.data),
+  createCommitment: (payload: Record<string, unknown>) =>
+    api.post<Commitment>("/investors/commitments", payload).then((r) => r.data),
+  createCapitalAccount: (payload: Record<string, unknown>) =>
+    api.post<CapitalAccount>("/investors/capital-accounts", payload).then((r) => r.data),
 };
 
 export const Transactions = {
@@ -95,6 +100,12 @@ export const Periods = {
   close: (id: number) => api.post<AccountingPeriod>(`/periods/${id}/close`).then((r) => r.data),
   reopen: (id: number, reason: string) =>
     api.post<AccountingPeriod>(`/periods/${id}/reopen`, { reason }).then((r) => r.data),
+  steps: (periodId: number) =>
+    api.get<CloseStep[]>(`/periods/${periodId}/steps`).then((r) => r.data),
+  addStep: (periodId: number, payload: Record<string, unknown>) =>
+    api.post<CloseStep>(`/periods/${periodId}/steps`, payload).then((r) => r.data),
+  signOffStep: (stepId: number) =>
+    api.post<CloseStep>(`/periods/steps/${stepId}/sign-off`).then((r) => r.data),
 };
 
 export const Jobs = {
