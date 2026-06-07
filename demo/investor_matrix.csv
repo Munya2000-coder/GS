@@ -1,0 +1,5 @@
+Investor,Commitment,SideLetter,CustomReporting,Restriction,Tax,MFN,Review
+LP01,80000000.00,False,Standard,None,Standard K-1,False,False
+LP07,80000000.00,True,Fee detail,None,Standard K-1,False,True
+LP12,80000000.00,True,Standard,ESG exclusion,Standard K-1,False,True
+LP14,80000000.00,False,Standard,None,Standard K-1,False,False
