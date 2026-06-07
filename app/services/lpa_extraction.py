@@ -100,6 +100,7 @@ def extract_document(session: Session, *, user: AuthUser, document_id: int) -> S
             explanation=cand.explanation,
             confidence_score=cand.confidence,
             requires_human_review=cand.requires_human_review,
+            ambiguous=cand.ambiguous,
             status=RuleStatus.PENDING_REVIEW,
         )
         session.add(rule)

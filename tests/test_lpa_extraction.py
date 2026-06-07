@@ -138,7 +138,101 @@ def test_every_candidate_has_source_traceability():
     for cand in parse_document(SAMPLE_LPA, DocumentType.LPA):
         assert cand.source_text_excerpt
         assert cand.source_section is not None
+        assert cand.exact_extracted_text  # FR-3 verbatim citation text
         assert Decimal("0") < cand.confidence <= Decimal("0.95")
+
+
+def test_ambiguity_phrase_forces_review_and_amber():
+    text = (
+        "Section 5.1 Management Fee\n"
+        "The Management Fee shall be 2.0% of committed capital, payable quarterly, "
+        "unless otherwise determined by the General Partner in its sole discretion."
+    )
+    cand = parse_document(text, DocumentType.LPA)[0]
+    assert cand.ambiguous is True
+    assert cand.requires_human_review is True
+    assert cand.confidence <= Decimal("0.70")
+    assert cand.extracted["ambiguity_phrase"]
+
+
+def test_catch_up_split_extracted():
+    text = (
+        "Section 8.2(c) Carried Interest\n"
+        "Carried interest of 20% with a 100% GP catch-up and an 80/20 split thereafter."
+    )
+    cand = next(c for c in parse_document(text, DocumentType.LPA)
+                if c.rule_type == ClauseType.CARRIED_INTEREST)
+    assert cand.extracted["gp_catch_up_split"] == "80/20"
+
+
+def test_blueprint_assembles_fr2_schema_with_citations(client):
+    fund_id = _make_fund(client)
+    doc_id = client.post(
+        "/lpa/documents", headers=auth_headers("alice"),
+        json={"name": "Fund I LPA.pdf", "document_type": "lpa",
+              "raw_text": SAMPLE_LPA, "entity_id": fund_id},
+    ).json()["id"]
+    client.post(f"/lpa/documents/{doc_id}/extract", headers=auth_headers("alice"))
+
+    bp = client.get(f"/lpa/documents/{doc_id}/blueprint", headers=auth_headers("alice"))
+    assert bp.status_code == 200, bp.text
+    body = bp.json()
+
+    # FR-2 exact schema shape
+    assert set(body["waterfall_rules"]) == {
+        "preferred_return_rate", "calculation_basis", "gp_catch_up_provision",
+        "gp_catch_up_split", "carried_interest_rate",
+    }
+    assert set(body["fee_economics"]) == {
+        "management_fee_rate", "fee_basis_investment_period",
+        "fee_basis_post_investment_period",
+    }
+
+    # fund_metadata resolved from the identity clause (not the filename)
+    assert "Opportunities" in body["fund_metadata"]["fund_name"]["value"]
+    assert body["fund_metadata"]["fund_name"]["citation"]["clause_reference"] == "Section 1.1"
+
+    # FR-2 values
+    assert body["waterfall_rules"]["preferred_return_rate"]["value"] == 0.08
+    assert body["waterfall_rules"]["carried_interest_rate"]["value"] == 0.20
+    assert body["fee_economics"]["management_fee_rate"]["value"] == 0.02
+    assert body["fee_economics"]["fee_basis_investment_period"]["value"] == "Committed Capital"
+    assert body["fee_economics"]["fee_basis_post_investment_period"]["value"] == "Invested Capital"
+
+    # FR-3 citation object on each field
+    fee = body["fee_economics"]["management_fee_rate"]
+    cit = fee["citation"]
+    assert cit["clause_reference"] == "Section 5.1"
+    assert cit["page_number"] == 1
+    assert "Management Fee" in cit["exact_extracted_text"]
+    assert "bounding_box_coordinates" in cit
+
+    # FR-4 traffic light present on every field
+    assert fee["status"] in ("green_confirmed", "amber_review")
+    assert body["summary"]["fields_total"] >= 8
+
+
+def test_blueprint_flags_side_letter_override(client):
+    fund_id = _make_fund(client)
+    lpa_doc = client.post(
+        "/lpa/documents", headers=auth_headers("alice"),
+        json={"name": "LPA", "document_type": "lpa", "raw_text": SAMPLE_LPA, "entity_id": fund_id},
+    ).json()["id"]
+    client.post(f"/lpa/documents/{lpa_doc}/extract", headers=auth_headers("alice"))
+    side = client.post(
+        "/lpa/documents", headers=auth_headers("alice"),
+        json={"name": "Side Letter", "document_type": "side_letter",
+              "raw_text": "Section 2 Fee\nThe management fee for the Investor shall be 1.5%.",
+              "entity_id": fund_id},
+    ).json()["id"]
+    client.post(f"/lpa/documents/{side}/extract", headers=auth_headers("alice"))
+
+    bp = client.get(f"/lpa/documents/{lpa_doc}/blueprint", headers=auth_headers("alice")).json()
+    assert bp["summary"]["overrides_flagged"] >= 1
+    ov = bp["side_letter_overrides"][0]
+    assert ov["override_type"] == "management_fee_discount"
+    assert ov["override_value"] == "1.5%"
+    assert ov["citation"]["clause_reference"] == "Section 2"
 
 
 # --------------------------------------------------------------------------- #

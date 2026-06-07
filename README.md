@@ -140,7 +140,7 @@ Dockerfile, docker-compose.yml
 | Performance | IRR, TVPI, DPI, RVPI, MOIC, PIC |
 | Dashboards | platform, fund, operations |
 | Exports | transactions.csv, trial-balance.csv, capital-accounts.csv, journal-entries.csv |
-| LPA Intelligence | `/lpa/documents` upload+extract, `/lpa/rules` review/approve/reject, `/lpa/issues`, `/lpa/conflicts`, `/lpa/validate/{management-fee,capital-call,waterfall}` |
+| LPA Intelligence | `/lpa/documents` upload+extract, `/lpa/documents/{id}/blueprint` (Fund Logic Blueprint), `/lpa/rules` review/approve/reject, `/lpa/issues`, `/lpa/conflicts`, `/lpa/validate/{management-fee,capital-call,waterfall}` |
 | Audit | events, lineage upstream/downstream |
 | Admin | users provisioning, deactivate |
 | Reconciliation | batch recon, exception assignment |
@@ -189,6 +189,34 @@ fund operating rule extraction system:
   fees, capital calls, and distribution waterfalls from the approved rules and
   explain every variance back to the governing source clause — the spreadsheet
   is never simply trusted.
+
+#### POC #1 — Fund Logic Blueprint
+
+`GET /lpa/documents/{id}/blueprint` returns the consolidated **Fund Logic
+Blueprint** that powers the split-screen "Aha!" workspace, mapping directly to
+the POC #1 functional requirements:
+
+- **FR-2 Domain-targeted schema**: `fund_metadata` (fund_name, currency),
+  `waterfall_rules` (preferred_return_rate, calculation_basis,
+  gp_catch_up_provision, gp_catch_up_split, carried_interest_rate),
+  `fee_economics` (management_fee_rate, fee_basis_investment_period,
+  fee_basis_post_investment_period).
+- **FR-3 Ground-truth citations**: every field carries a `citation` with
+  `page_number`, `clause_reference`, `exact_extracted_text` (verbatim), and a
+  `bounding_box_coordinates` slot. The citation is the product — the front-end
+  click-to-trace highlights the source paragraph from these anchors.
+- **FR-4 Confidence & traffic-light**: each field exposes a confidence score
+  and a `status` of `green_confirmed` (≥90%) or `amber_review` (<75% or
+  contains a discretionary/ambiguous phrase such as "in the sole discretion of
+  the General Partner"). `side_letter_overrides` surfaces LP-specific carve-outs
+  with their own citations.
+
+> **Citation note:** ingestion is text-based (PDF text + `[[page]]`/form-feed
+> page markers), so citations resolve to page + clause + verbatim text. Pixel
+> `bounding_box_coordinates` require a coordinate-aware PDF parse layer — the
+> field is present and reserved for that next step. The two-screen UI
+> (drag-and-drop upload → split-screen blueprint/PDF with click-to-trace) is a
+> front-end build on top of this API.
 
 ## Design principles
 

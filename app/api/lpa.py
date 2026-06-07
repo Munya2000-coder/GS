@@ -38,12 +38,14 @@ from app.schemas.lpa import (
     RuleRejection,
     WaterfallValidationRequest,
 )
-from app.services import lpa_extraction, lpa_validation
+from app.services import lpa_blueprint, lpa_extraction, lpa_validation
+from app.services.lpa_parser import traffic_light
 
 router = APIRouter(prefix="/lpa", tags=["lpa"])
 
 
 def _rule_out(rule: ExtractedRule) -> ExtractedRuleOut:
+    payload = json.loads(rule.extracted_json or "{}")
     return ExtractedRuleOut(
         id=rule.id,
         document_id=rule.document_id,
@@ -55,9 +57,11 @@ def _rule_out(rule: ExtractedRule) -> ExtractedRuleOut:
         source_page_start=rule.source_page_start,
         source_page_end=rule.source_page_end,
         source_text_excerpt=rule.source_text_excerpt,
-        extracted=json.loads(rule.extracted_json or "{}"),
+        exact_extracted_text=payload.get("exact_extracted_text"),
+        extracted=payload,
         explanation=rule.explanation,
         confidence_score=rule.confidence_score,
+        status_light=traffic_light(Decimal(str(rule.confidence_score)), rule.ambiguous),
         requires_human_review=rule.requires_human_review,
         ambiguous=rule.ambiguous,
         status=rule.status,
@@ -93,6 +97,21 @@ def list_documents(
     if entity_id is not None:
         q = q.filter(SourceDocument.entity_id == entity_id)
     return q.order_by(SourceDocument.id.desc()).all()
+
+
+@router.get("/documents/{document_id}/blueprint")
+def get_blueprint(
+    document_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    """The FR-2 Fund Logic Blueprint: consolidated waterfall / fee / metadata
+    fields, each with a ground-truth citation (FR-3) and traffic-light status
+    (FR-4), plus flagged side-letter overrides."""
+    try:
+        return lpa_blueprint.build_blueprint(session, document_id=document_id)
+    except ValueError as ex:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(ex))
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)

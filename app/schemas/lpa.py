@@ -47,9 +47,11 @@ class ExtractedRuleOut(ORMBase):
     source_page_start: int | None
     source_page_end: int | None
     source_text_excerpt: str
+    exact_extracted_text: str | None = None
     extracted: dict[str, Any]
     explanation: str | None
     confidence_score: Decimal
+    status_light: str | None = None
     requires_human_review: bool
     ambiguous: bool
     status: RuleStatus

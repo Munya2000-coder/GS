@@ -61,8 +61,38 @@ REQUIRED_PE_RULES: tuple[ClauseType, ...] = (
 )
 
 REVIEW_THRESHOLD = Decimal("0.90")
+# Traffic-light thresholds (FR-4): green = confirmed, amber = review.
+GREEN_THRESHOLD = Decimal("0.90")
+AMBER_THRESHOLD = Decimal("0.75")
+# Ceiling applied to confidence when an ambiguity phrase is present, forcing
+# the rule into the amber "needs human review" band.
+AMBIGUOUS_CONFIDENCE_CEILING = Decimal("0.70")
+
+# Discretionary / ambiguous legal phrases that must trigger human review
+# regardless of how cleanly the surrounding values parsed (FR-4).
+AMBIGUITY_PHRASES: tuple[str, ...] = (
+    "unless otherwise determined by the general partner",
+    "unless otherwise agreed",
+    "in the sole discretion",
+    "in its sole discretion",
+    "as the general partner may determine",
+    "as the general partner may decide",
+    "as may be determined by the general partner",
+    "may, in its discretion",
+    "to the extent determined by the general partner",
+    "as may be agreed",
+    "from time to time as determined",
+    "subject to adjustment",
+)
 
 _PCT = re.compile(r"(\d+(?:\.\d+)?)\s*%")
+_SPLIT = re.compile(r"\b(\d{1,3})\s*/\s*(\d{1,3})\b")
+_CURRENCY_WORDS = {
+    "u.s. dollar": "USD", "us dollar": "USD", "united states dollar": "USD",
+    "dollar": "USD", "euro": "EUR", "pound sterling": "GBP", "sterling": "GBP",
+    "british pound": "GBP", "swiss franc": "CHF", "japanese yen": "JPY", "yen": "JPY",
+}
+_ISO_CURRENCY = re.compile(r"\b(USD|EUR|GBP|CHF|JPY|CAD|AUD|HKD|SGD|SEK|NOK|DKK)\b")
 _DAYS = re.compile(r"(\d+)\s*(?:calendar|business)?\s*[- ]?\s*days", re.IGNORECASE)
 _SECTION_HEADER = re.compile(
     r"^\s*(?:\[\[page\]\]|\f)?\s*(?:Section|Article|Clause|§)\s+(\d+(?:\.\d+)*(?:\([a-z]\))?)",
@@ -103,7 +133,7 @@ _CLAUSE_KEYWORDS: dict[ClauseType, tuple[str, ...]] = {
     ClauseType.CONFIDENTIALITY: ("confidential",),
     ClauseType.REGULATORY: ("erisa", "aifmd", "regulatory"),
     ClauseType.CONSENT: ("majority in interest", "supermajority", "consent of the limited partners", "vote of"),
-    ClauseType.FUND_IDENTITY: ("name of the fund", "formed under", "formation of the partnership", "general partner of the fund"),
+    ClauseType.FUND_IDENTITY: ("name of the fund", "name of the partnership", "formed under", "formation of the partnership", "base currency", "general partner of the fund"),
     ClauseType.DEFINITIONS: ("as used in this agreement", "definitions"),
 }
 
@@ -128,7 +158,9 @@ class RuleCandidate:
     source_page_start: int
     source_page_end: int
     source_text_excerpt: str
+    exact_extracted_text: str = field(default="")
     requires_human_review: bool = field(default=True)
+    ambiguous: bool = field(default=False)
 
 
 def split_sections(text: str) -> list[Section]:
@@ -255,6 +287,50 @@ def _excerpt(body: str, limit: int = 600) -> str:
     return body if len(body) <= limit else body[:limit].rstrip() + "…"
 
 
+def _strip_header(body: str) -> str:
+    """Remove the leading 'Section N Title' echo from a section body."""
+    m = re.match(r"^\s*(?:Section|Article|Clause|§)\s+\S+\s*", body, re.IGNORECASE)
+    return body[m.end():].lstrip() if m else body
+
+
+def _verbatim(body: str, *keywords: str, limit: int = 300) -> str:
+    """Return the literal sentence best evidencing the extraction (FR-3
+    exact_extracted_text). Prefers a sentence containing one of `keywords`,
+    else the first substantive sentence."""
+    text = _strip_header(body)
+    sentences = [s.strip() for s in re.split(r"(?<=[.;:])\s+", text) if s.strip()]
+    if not sentences:
+        return text[:limit]
+    low_keywords = [k.lower() for k in keywords]
+    for sentence in sentences:
+        low = sentence.lower()
+        if any(k in low for k in low_keywords):
+            return sentence[:limit]
+    return sentences[0][:limit]
+
+
+def _catch_up_split(text: str) -> str | None:
+    m = _SPLIT.search(text)
+    return f"{m.group(1)}/{m.group(2)}" if m else None
+
+
+def _detect_ambiguity(text: str) -> str | None:
+    low = text.lower()
+    for phrase in AMBIGUITY_PHRASES:
+        if phrase in low:
+            return phrase
+    return None
+
+
+def traffic_light(confidence: Decimal, ambiguous: bool) -> str:
+    """Map confidence + ambiguity onto the FR-4 traffic-light system."""
+    if ambiguous or confidence < AMBER_THRESHOLD:
+        return "amber_review"
+    if confidence >= GREEN_THRESHOLD:
+        return "green_confirmed"
+    return "amber_review"
+
+
 def _extract_management_fee(s: Section) -> tuple[dict, Decimal, str]:
     body = s.body
     low = body.lower()
@@ -291,6 +367,7 @@ def _extract_management_fee(s: Section) -> tuple[dict, Decimal, str]:
         "rule_type": "management_fee",
         "fee_rate": rate,
         "fee_base": base,
+        "fee_basis_investment_period": base,
         "frequency": frequency,
         "offsets": offsets,
         "source_clause": _section_ref(s),
@@ -299,6 +376,22 @@ def _extract_management_fee(s: Section) -> tuple[dict, Decimal, str]:
         extracted["step_down_trigger"] = "end_of_investment_period"
         if len(pcts) > 1:
             extracted["post_step_down_rate"] = pcts[1]
+        # the fee base named *after* the earliest step-down indicator is the
+        # post-period basis (commonly invested capital).
+        indicators = [low.find(k) for k in ("step down", "step-down", "step", "following")]
+        step_pos = min([p for p in indicators if p >= 0], default=-1)
+        post_base = None
+        post_pos = len(low) + 1
+        for label, key in (
+            ("net invested capital", "net_invested_capital"),
+            ("invested capital", "invested_capital"),
+            ("committed capital", "committed_capital"),
+            ("net asset value", "nav"),
+        ):
+            idx = low.find(label, step_pos if step_pos >= 0 else 0)
+            if idx != -1 and idx < post_pos:
+                post_base, post_pos = key, idx
+        extracted["fee_basis_post_investment_period"] = post_base
     found = sum(x is not None and x != [] for x in (rate, base, frequency))
     conf = _confidence(found, 3)
     expl = "Drives periodic management-fee accruals charged to investors."
@@ -320,10 +413,18 @@ def _extract_preferred_return(s: Section) -> tuple[dict, Decimal, str]:
     elif "contributed capital" in low or "capital contribution" in low:
         base = "contributed_capital"
     day_count = "actual_365" if "365" in low else ("actual_360" if "360" in low else None)
+    # Human-readable basis for the blueprint, e.g. "Compounded Annually".
+    calc_basis = None
+    if method == "compound":
+        adverb = {"annual": "Annually", "quarterly": "Quarterly"}.get(comp)
+        calc_basis = f"Compounded {adverb}" if adverb else "Compounded"
+    elif method == "simple":
+        calc_basis = "Simple"
     extracted = {
         "rule_type": "preferred_return",
         "rate": rate,
         "calculation_method": method,
+        "calculation_basis": calc_basis,
         "compounding_frequency": comp,
         "base": base,
         "day_count_convention": day_count,
@@ -336,15 +437,17 @@ def _extract_preferred_return(s: Section) -> tuple[dict, Decimal, str]:
 def _extract_carried_interest(s: Section) -> tuple[dict, Decimal, str]:
     low = s.body.lower()
     carry = _first_pct(s.body)
+    has_catchup = "catch-up" in low or "catch up" in low or "catchup" in low
     extracted = {
         "rule_type": "carried_interest",
         "carry_percentage": carry,
         "recipient": "general_partner",
-        "catch_up": "catch-up" in low or "catch up" in low or "catchup" in low,
+        "catch_up": has_catchup,
+        "gp_catch_up_split": _catch_up_split(s.body),
         "clawback_required": "clawback" in low or "claw-back" in low,
         "source_clause": _section_ref(s),
     }
-    found = sum(bool(x) for x in (carry, extracted["catch_up"]))
+    found = sum(bool(x) for x in (carry, has_catchup))
     return extracted, _confidence(found, 2), "GP profit share; gates downstream clawback exposure."
 
 
@@ -542,12 +645,33 @@ def _extract_profit_loss(s: Section) -> tuple[dict, Decimal, str]:
 
 
 def _extract_fund_identity(s: Section) -> tuple[dict, Decimal, str]:
+    name = None
+    nm = re.search(
+        r"name of the (?:fund|partnership) is\s+(.+?)(?:\s*\(|[,.;]| formed| is a| shall)",
+        s.body,
+        re.IGNORECASE,
+    )
+    if nm:
+        name = nm.group(1).strip()
+    currency = None
+    cm = _ISO_CURRENCY.search(s.body)
+    if cm:
+        currency = cm.group(1)
+    else:
+        low = s.body.lower()
+        for word, iso in _CURRENCY_WORDS.items():
+            if word in low:
+                currency = iso
+                break
     extracted = {
         "rule_type": "fund_identity",
+        "fund_name": name,
+        "currency": currency,
         "term_years": _years(s.body),
         "source_clause": _section_ref(s),
     }
-    return extracted, _confidence(1 if extracted["term_years"] else 0, 1), "Core fund identity and term."
+    found = sum(x is not None for x in (name, currency, extracted["term_years"]))
+    return extracted, _confidence(found, 3), "Core fund identity, currency, and term."
 
 
 def _extract_generic(s: Section, clause: ClauseType) -> tuple[dict, Decimal, str]:
@@ -606,6 +730,12 @@ def _extract_side_letter(s: Section) -> RuleCandidate | None:
             }
             found = 1 + (value is not None)
             conf = _confidence(found, 2)
+            verbatim = _verbatim(s.body, phrase)
+            extracted["exact_extracted_text"] = verbatim
+            ambiguity = _detect_ambiguity(s.body)
+            if ambiguity:
+                conf = min(conf, AMBIGUOUS_CONFIDENCE_CEILING)
+                extracted["ambiguity_phrase"] = ambiguity
             return RuleCandidate(
                 rule_type=ClauseType.SIDE_LETTER,
                 clause_type=clause,
@@ -616,9 +746,26 @@ def _extract_side_letter(s: Section) -> RuleCandidate | None:
                 source_page_start=s.page_start,
                 source_page_end=s.page_end,
                 source_text_excerpt=_excerpt(s.body),
+                exact_extracted_text=verbatim,
                 requires_human_review=True,
+                ambiguous=ambiguity is not None,
             )
     return None
+
+
+# Keywords used to locate the most evidentiary sentence per clause type (FR-3).
+_VERBATIM_HINTS: dict[ClauseType, tuple[str, ...]] = {
+    ClauseType.MANAGEMENT_FEE: ("management fee", "%"),
+    ClauseType.PREFERRED_RETURN: ("preferred return", "hurdle", "%"),
+    ClauseType.CARRIED_INTEREST: ("carried interest", "carry", "%"),
+    ClauseType.CAPITAL_CALL: ("capital call", "notice", "drawdown"),
+    ClauseType.DISTRIBUTION_WATERFALL: ("distribut", "waterfall"),
+    ClauseType.CLAWBACK: ("clawback", "restore", "excess"),
+    ClauseType.INVESTMENT_PERIOD: ("investment period", "year"),
+    ClauseType.FUND_IDENTITY: ("name of the", "term of the"),
+    ClauseType.FUND_EXPENSE: ("expense", "cap"),
+    ClauseType.REPORTING: ("report", "financial statement", "days"),
+}
 
 
 def extract_from_section(section: Section, document_type: DocumentType) -> RuleCandidate | None:
@@ -638,7 +785,20 @@ def extract_from_section(section: Section, document_type: DocumentType) -> RuleC
     else:
         extracted, confidence, explanation = _extract_generic(section, clause)
 
-    requires_review = confidence < REVIEW_THRESHOLD or clause in MONEY_MOVEMENT_CLAUSES
+    # FR-3: attach the literal evidentiary sentence to the rule.
+    verbatim = _verbatim(section.body, *_VERBATIM_HINTS.get(clause, ()))
+    extracted["exact_extracted_text"] = verbatim
+
+    # FR-4: discretionary phrases force the rule into the review band.
+    ambiguity = _detect_ambiguity(section.body)
+    ambiguous = ambiguity is not None
+    if ambiguous:
+        confidence = min(confidence, AMBIGUOUS_CONFIDENCE_CEILING)
+        extracted["ambiguity_phrase"] = ambiguity
+
+    requires_review = (
+        confidence < REVIEW_THRESHOLD or ambiguous or clause in MONEY_MOVEMENT_CLAUSES
+    )
     return RuleCandidate(
         rule_type=clause,
         clause_type=clause,
@@ -649,7 +809,9 @@ def extract_from_section(section: Section, document_type: DocumentType) -> RuleC
         source_page_start=section.page_start,
         source_page_end=section.page_end,
         source_text_excerpt=_excerpt(section.body),
+        exact_extracted_text=verbatim,
         requires_human_review=requires_review,
+        ambiguous=ambiguous,
     )
 
 
