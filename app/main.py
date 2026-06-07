@@ -16,6 +16,7 @@ from app.api import (
     integrations,
     investors,
     jobs,
+    lpa,
     nav,
     performance,
     periods,
@@ -102,7 +103,7 @@ def create_app() -> FastAPI:
         admin.router, reconciliation.router, integrations.router,
         periods.router, performance.router, capital_calls.router,
         distributions.router, nav.router, dashboards.router,
-        exports.router, jobs.router, ui_routes.router,
+        exports.router, jobs.router, lpa.router, ui_routes.router,
     ):
         app.include_router(r)
 

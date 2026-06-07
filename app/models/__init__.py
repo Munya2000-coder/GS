@@ -12,6 +12,7 @@ def register_models() -> None:
         investor,
         job,
         journal,
+        lpa,
         nav,
         period,
         reconciliation,

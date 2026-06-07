@@ -4,7 +4,7 @@ End-to-end private capital operations platform: fund accounting, partnership
 accounting, investor administration, fee management, carry/waterfall
 administration, reporting, reconciliations, audit trails, and integrations.
 
-Covers all 12 epics of the master user story package with a real REST API,
+Covers all 13 epics of the master user story package with a real REST API,
 server-rendered HTML UI, background-job tracking, CSV exports, performance
 analytics, capital-call & distribution workflows, NAV management, period and
 close-calendar controls, and a CLI for administration.
@@ -94,19 +94,19 @@ docker compose up --build
 - Python 3.11+ · FastAPI · SQLAlchemy 2.x · Pydantic v2
 - Jinja2 server-rendered UI
 - SQLite (dev) / Postgres (prod) — swap via `DATABASE_URL`
-- pytest (28 tests)
+- pytest (50 tests)
 
 ## Layout
 
 ```
 app/
   core/           config, database, security/RBAC
-  models/         domain model (20 tables)
+  models/         domain model (24 tables)
   schemas/        Pydantic contracts
   services/       accounting, fees, waterfall, capital calls, distributions,
                   NAV, close, performance (IRR/TVPI/DPI), dashboards,
                   reconciliation, exports, jobs, migration, seed
-  api/            REST routers (18, one per epic/sub-domain)
+  api/            REST routers (19, one per epic/sub-domain)
   ui/             Jinja2 HTML (legacy, kept for /ui/)
   spa.py          mounts the compiled React SPA from app/static/
   cli.py          gsctl command-line tool
@@ -117,7 +117,7 @@ frontend/         React + TypeScript + Vite SPA
   src/pages/      Login, Dashboard, Funds, FundDetail, Investors,
                   Transactions, CapitalCalls, Distributions, Periods,
                   Operations, Audit
-tests/            pytest suite (29 tests)
+tests/            pytest suite (50 tests)
 scripts/          bootstrap + ops helpers
 Dockerfile, docker-compose.yml
 ```
@@ -140,6 +140,7 @@ Dockerfile, docker-compose.yml
 | Performance | IRR, TVPI, DPI, RVPI, MOIC, PIC |
 | Dashboards | platform, fund, operations |
 | Exports | transactions.csv, trial-balance.csv, capital-accounts.csv, journal-entries.csv |
+| LPA Intelligence | `/lpa/documents` upload+extract, `/lpa/rules` review/approve/reject, `/lpa/issues`, `/lpa/conflicts`, `/lpa/validate/{management-fee,capital-call,waterfall}` |
 | Audit | events, lineage upstream/downstream |
 | Admin | users provisioning, deactivate |
 | Reconciliation | batch recon, exception assignment |
@@ -162,6 +163,32 @@ Dockerfile, docker-compose.yml
 | 10 | Security & User Administration | `core/security.py`, `models/user.py`, `api/admin.py` |
 | 11 | Reconciliation & Controls | `services/reconciliation.py`, import exception queue |
 | 12 | Migration, Testing, Go-Live | `services/migration.py`, `services/seed.py`, test suite |
+| 13 | LPA Document Intelligence & Rule Extraction | `models/lpa.py`, `services/lpa_parser.py`, `services/lpa_extraction.py`, `services/lpa_validation.py`, `api/lpa.py` |
+
+### Epic 13 — LPA as the source of truth
+
+The LPA (and its side letters / amendments) is converted into a structured,
+source-traceable, human-approved operating rule set that downstream validators
+execute against. This is **not** a generic PDF chatbot — it is a deterministic
+fund operating rule extraction system:
+
+- **Parse** governing-document text into numbered sections (page ranges
+  preserved via form-feed or `[[page]]` markers).
+- **Classify** each section against the approved clause taxonomy
+  (`ClauseType`: management_fee, distribution_waterfall, preferred_return,
+  carried_interest, clawback, capital_call, …).
+- **Extract** a structured JSON rule per clause with **full source
+  traceability** (document, section, page, text excerpt) and a **confidence
+  score**. Money-movement clauses are always flagged for human review.
+- **Detect** missing required operating rules and conflicts (e.g. a side-letter
+  fee override of an LPA clause) as first-class records.
+- **Review lifecycle**: `draft_ai_extracted → pending_review → approved`
+  (also `rejected`, `needs_legal_review`, `superseded`). No rule is executable
+  until it is `approved` *and* carries source traceability.
+- **Validate independently**: `/lpa/validate/*` recompute expected management
+  fees, capital calls, and distribution waterfalls from the approved rules and
+  explain every variance back to the governing source clause — the spreadsheet
+  is never simply trusted.
 
 ## Design principles
 
