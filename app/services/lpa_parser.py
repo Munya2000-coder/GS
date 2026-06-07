@@ -169,7 +169,7 @@ def split_sections(text: str) -> list[Section]:
 
     sections: list[Section] = []
     if not headers:
-        clean = _PAGE_MARKER.sub("", text).strip()
+        clean = re.sub(r"\s+", " ", _PAGE_MARKER.sub(" ", text)).strip()
         if clean:
             sections.append(Section(None, "", clean, 1, max_page))
         return sections
@@ -177,7 +177,10 @@ def split_sections(text: str) -> list[Section]:
     for idx, (offset, number_offset, number, title) in enumerate(headers):
         end = headers[idx + 1][0] if idx + 1 < len(headers) else len(text)
         raw_body = text[offset:end]
-        body = _PAGE_MARKER.sub("", raw_body).strip()
+        # Collapse line wraps and page markers to single spaces so phrase
+        # matching is robust to how the document happens to be line-broken
+        # (e.g. "net\nof tax" must still match "net of tax").
+        body = re.sub(r"\s+", " ", _PAGE_MARKER.sub(" ", raw_body)).strip()
         sections.append(
             Section(
                 number=number,

@@ -121,6 +121,19 @@ def test_parse_extracts_key_rules():
     assert clawback.extracted["payment_deadline_days"] == 90
 
 
+def test_phrase_matching_is_robust_to_line_wrapping():
+    # "net of tax" wraps across a line break; matching must still detect it.
+    text = (
+        "Section 8.5 Clawback\n"
+        "Upon liquidation the General Partner shall restore excess carried\n"
+        "interest, net\nof tax, within 90 days."
+    )
+    candidates = parse_document(text, DocumentType.LPA)
+    clawback = next(c for c in candidates if c.rule_type == ClauseType.CLAWBACK)
+    assert clawback.extracted["net_of_tax"] is True
+    assert clawback.extracted["payment_deadline_days"] == 90
+
+
 def test_every_candidate_has_source_traceability():
     for cand in parse_document(SAMPLE_LPA, DocumentType.LPA):
         assert cand.source_text_excerpt
