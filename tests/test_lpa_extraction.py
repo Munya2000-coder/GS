@@ -1,6 +1,7 @@
 """LPA document intelligence: parsing, extraction, review lifecycle, conflict
 and missing-rule detection, and independent validations."""
 
+import json
 from decimal import Decimal
 
 from app.models.lpa import ClauseType, DocumentType
@@ -335,6 +336,145 @@ def test_side_letter_creates_conflict(client):
 # --------------------------------------------------------------------------- #
 # Independent validators                                                       #
 # --------------------------------------------------------------------------- #
+
+FULL_LPA = """
+Section 1.1 Name and Currency
+The name of the Fund is GrowthSense Real Estate Fund I, L.P. The base currency of
+the Fund is USD. The term of the Fund is ten (10) years.
+
+Section 3.1 Investment Mandate
+The Fund shall invest primarily in United States real estate only. Non-US
+investments are not permitted.
+
+Section 5.1 Management Fee
+The Management Fee shall be 2.0% per annum of committed capital, payable
+quarterly in advance during the first year.
+
+Section 6.3 Fund Expenses
+Organizational expenses of the Partnership are capped at 1,000,000; audit fees
+and tax fees are accrued quarterly and paid annually.
+
+Section 8.1 Treasury
+The banking relationship is with AXZ Bankers. Wire instructions are provided.
+
+Section 12.1 Reporting
+The Partnership shall deliver audited financial statements annually within 120
+days after fiscal year end to the Limited Partners.
+
+Section 12.2 Capital Account Reporting
+Capital account statements shall be delivered quarterly within 45 days after
+quarter end.
+
+Section 14.1 Tax Reporting
+Each Limited Partner shall receive a Schedule K-1 annually, with UBTI reporting.
+"""
+
+PPM_CONFLICTING = """
+Section 2.1 Investment Strategy
+The Fund invests primarily in North America real estate.
+
+Section 4.1 Management Fee
+The management fee disclosed to investors is 1.5% of committed capital.
+"""
+
+
+def _make_fund_with_investors(client):
+    fund_id = _make_fund(client)
+    investors = {}
+    for code in ("LP07", "LP12"):
+        client.post("/investors", headers=auth_headers("admin"),
+                    json={"code": code, "legal_name": code, "short_name": code, "domicile": "US"})
+    for inv in client.get("/investors", headers=auth_headers("alice")).json():
+        if inv["code"] in ("LP07", "LP12"):
+            investors[inv["code"]] = inv["id"]
+            client.post("/investors/commitments", headers=auth_headers("admin"),
+                        json={"investor_id": inv["id"], "entity_id": fund_id, "closing_id": "C1",
+                              "closing_date": "2025-01-01", "investor_class": "A",
+                              "commitment_amount": "80000000", "currency": "USD"})
+    return fund_id, investors
+
+
+def test_operating_pack_end_to_end(client):
+    fund_id, investors = _make_fund_with_investors(client)
+
+    lpa = client.post("/lpa/documents", headers=auth_headers("alice"),
+                      json={"name": "GSRE LPA", "document_type": "lpa",
+                            "raw_text": FULL_LPA, "entity_id": fund_id}).json()["id"]
+    client.post(f"/lpa/documents/{lpa}/extract", headers=auth_headers("alice"))
+
+    ppm = client.post("/lpa/documents", headers=auth_headers("alice"),
+                      json={"name": "GSRE PPM", "document_type": "ppm",
+                            "raw_text": PPM_CONFLICTING, "entity_id": fund_id}).json()["id"]
+    client.post(f"/lpa/documents/{ppm}/extract", headers=auth_headers("alice"))
+
+    # investor-specific side letters
+    client.post("/lpa/documents", headers=auth_headers("alice"),
+                json={"name": "LP07 Side Letter", "document_type": "side_letter",
+                      "raw_text": "Section 4\nThe Investor shall receive quarterly management fee and expense detail.",
+                      "entity_id": fund_id, "investor_id": investors["LP07"]})
+    client.post("/lpa/documents", headers=auth_headers("alice"),
+                json={"name": "LP12 Side Letter", "document_type": "side_letter",
+                      "raw_text": "Section 3\nThe Investor requires ESG reporting and exclusion of tobacco.",
+                      "entity_id": fund_id, "investor_id": investors["LP12"]})
+    for d in client.get("/lpa/documents", params={"entity_id": fund_id}, headers=auth_headers("alice")).json():
+        if d["document_type"] == "side_letter":
+            client.post(f"/lpa/documents/{d['id']}/extract", headers=auth_headers("alice"))
+
+    pack = client.get(f"/lpa/funds/{fund_id}/operating-pack", headers=auth_headers("alice"))
+    assert pack.status_code == 200, pack.text
+    body = pack.json()
+
+    # spec §9.1 Fund Terms Summary
+    terms = {t["field"]: t["value"] for t in body["fund_terms_summary"]}
+    assert "GrowthSense Real Estate Fund I" in terms["Fund Name"]
+    assert terms["Management Fee"] == "2.0%"
+    assert terms["Bank"] == "AXZ Bankers"
+
+    # spec §9.2 portable operating rules carry summary + evidence
+    fee_rule = next(r for r in body["operating_rules"] if r["rule_type"] == "management_fee")
+    assert fee_rule["plain_english_summary"]
+    assert fee_rule["evidence_required"]
+    assert fee_rule["citation"]["source_reference"] == "Section 5.1"
+
+    # spec §9.3 Investor Obligation Matrix
+    inv_rows = {r["investor"]: r for r in body["investor_obligation_matrix"]}
+    assert inv_rows["LP07"]["side_letter"] is True
+    assert inv_rows["LP12"]["restriction"] == "ESG exclusion"
+
+    # spec §9.4 Reporting Obligation Matrix (fund-level + investor-specific)
+    reports = [r["report"] for r in body["reporting_obligation_matrix"]]
+    assert any("Audited" in r for r in reports)
+    assert any(r["investor_specific"] for r in body["reporting_obligation_matrix"])
+
+    # spec §9.5 Obligation Calendar
+    assert any("management fee" in c["obligation"].lower() for c in body["obligation_calendar"])
+
+    # spec §9.6 Exception Report includes the PPM-vs-LPA mismatches
+    kinds = {e["kind"] for e in body["exception_report"]}
+    assert "ppm_lpa_mandate_mismatch" in kinds
+    assert "ppm_lpa_fee_mismatch" in kinds
+
+
+def test_operating_pack_json_export(client):
+    fund_id = _make_fund(client)
+    doc = client.post("/lpa/documents", headers=auth_headers("alice"),
+                      json={"name": "LPA", "document_type": "lpa",
+                            "raw_text": FULL_LPA, "entity_id": fund_id}).json()["id"]
+    client.post(f"/lpa/documents/{doc}/extract", headers=auth_headers("alice"))
+    r = client.get(f"/lpa/funds/{fund_id}/operating-pack.json", headers=auth_headers("alice"))
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/json")
+    assert "attachment" in r.headers["content-disposition"]
+    assert json.loads(r.content)["fund_id"]
+
+
+def test_investment_mandate_extraction():
+    cand = next(c for c in parse_document(FULL_LPA, DocumentType.LPA)
+                if c.rule_type == ClauseType.INVESTMENT_MANDATE)
+    assert cand.extracted["asset_class"] == "real_estate"
+    assert cand.extracted["geography"] == "United States"
+    assert cand.extracted["non_us_investments_permitted"] is False
+
 
 def test_management_fee_validation_detects_underpayment():
     result = lpa_validation.validate_management_fee(

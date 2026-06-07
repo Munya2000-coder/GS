@@ -35,10 +35,35 @@ from app.models.mixins import TimestampMixin
 
 class DocumentType(StrEnum):
     LPA = "lpa"
+    PPM = "ppm"
     SIDE_LETTER = "side_letter"
     AMENDMENT = "amendment"
     SUBSCRIPTION = "subscription"
+    INVESTOR_REGISTER = "investor_register"
+    BANK_MEMO = "bank_memo"
+    REPORTING_TEMPLATE = "reporting_template"
+    FEE_LETTER = "fee_letter"
+    MANAGEMENT_AGREEMENT = "management_agreement"
+    TAX_MEMO = "tax_memo"
     OTHER = "other"
+
+
+# Document authority hierarchy (spec §6). Lower number = higher operating
+# authority; used to resolve which document governs when sources disagree.
+DOCUMENT_AUTHORITY: dict[DocumentType, int] = {
+    DocumentType.LPA: 1,
+    DocumentType.MANAGEMENT_AGREEMENT: 1,
+    DocumentType.AMENDMENT: 1,
+    DocumentType.SIDE_LETTER: 2,
+    DocumentType.SUBSCRIPTION: 3,
+    DocumentType.INVESTOR_REGISTER: 3,
+    DocumentType.PPM: 4,
+    DocumentType.FEE_LETTER: 4,
+    DocumentType.BANK_MEMO: 5,
+    DocumentType.TAX_MEMO: 5,
+    DocumentType.REPORTING_TEMPLATE: 5,
+    DocumentType.OTHER: 9,
+}
 
 
 class DocumentStatus(StrEnum):
@@ -69,9 +94,14 @@ class ClauseType(StrEnum):
     CLAWBACK = "clawback"
     TAX_DISTRIBUTION = "tax_distribution"
     PROFIT_LOSS_ALLOCATION = "profit_loss_allocation"
+    INVESTMENT_MANDATE = "investment_mandate"
     TRANSFER = "transfer"
     WITHDRAWAL = "withdrawal"
     REPORTING = "reporting"
+    REPORTING_OBLIGATION = "reporting_obligation"
+    TAX_REPORTING = "tax_reporting"
+    TREASURY = "treasury"
+    ESG = "esg"
     VALUATION = "valuation"
     ADVISORY_COMMITTEE = "advisory_committee"
     CONSENT = "consent"

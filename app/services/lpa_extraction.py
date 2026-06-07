@@ -121,6 +121,8 @@ def extract_document(session: Session, *, user: AuthUser, document_id: int) -> S
     _flag_low_confidence(session, doc, created)
     detect_missing_rules(session, doc)
     detect_conflicts(session, doc)
+    if doc.entity_id is not None:
+        detect_consistency(session, doc.entity_id)
     return doc
 
 
@@ -210,7 +212,21 @@ def detect_conflicts(session: Session, doc: SourceDocument) -> list[RuleConflict
         .all()
     )
 
-    base_rules = [r for r in active if r.rule_type != ClauseType.SIDE_LETTER]
+    # A side letter overrides the *governing* document only (LPA / management
+    # agreement / amendment), not the PPM disclosure — respect the hierarchy.
+    from app.models.lpa import DocumentType
+
+    governing = {DocumentType.LPA, DocumentType.MANAGEMENT_AGREEMENT, DocumentType.AMENDMENT}
+    doc_types = {
+        d.id: DocumentType(d.document_type)
+        for d in session.query(SourceDocument).filter(SourceDocument.entity_id == doc.entity_id).all()
+    }
+
+    base_rules = [
+        r for r in active
+        if r.rule_type != ClauseType.SIDE_LETTER
+        and doc_types.get(r.document_id) in governing
+    ]
     side_letters = [r for r in active if r.rule_type == ClauseType.SIDE_LETTER]
 
     base_by_clause: dict[ClauseType, list[ExtractedRule]] = {}
@@ -243,6 +259,80 @@ def detect_conflicts(session: Session, doc: SourceDocument) -> list[RuleConflict
 
     session.flush()
     return conflicts
+
+
+def detect_consistency(session: Session, entity_id: int) -> list[RuleConflict]:
+    """Cross-document consistency checks (spec §14.2): compare the disclosure
+    PPM against the governing LPA for fee and investment-mandate agreement.
+
+    The system never decides the legal answer — it flags mismatches for human
+    review, respecting the document-authority hierarchy."""
+    from app.models.lpa import DocumentType, SourceDocument
+
+    rules = (
+        session.query(ExtractedRule)
+        .filter(
+            ExtractedRule.entity_id == entity_id,
+            ExtractedRule.status.in_(
+                [RuleStatus.PENDING_REVIEW, RuleStatus.APPROVED, RuleStatus.DRAFT_AI_EXTRACTED]
+            ),
+        )
+        .all()
+    )
+    doc_types = {
+        d.id: DocumentType(d.document_type)
+        for d in session.query(SourceDocument).filter(SourceDocument.entity_id == entity_id).all()
+    }
+
+    def by_source(rule_type: ClauseType, dtype: DocumentType) -> ExtractedRule | None:
+        for r in rules:
+            if r.rule_type == rule_type and doc_types.get(r.document_id) == dtype:
+                return r
+        return None
+
+    conflicts: list[RuleConflict] = []
+
+    def _maybe_conflict(lpa_rule, ppm_rule, field, ctype, severity, label):
+        if lpa_rule is None or ppm_rule is None:
+            return
+        lv = json.loads(lpa_rule.extracted_json or "{}").get(field)
+        pv = json.loads(ppm_rule.extracted_json or "{}").get(field)
+        if lv is None or pv is None or _norm(lv) == _norm(pv):
+            return
+        if _conflict_exists(session, lpa_rule.id, ppm_rule.id):
+            return
+        conflicts.append(
+            RuleConflict(
+                entity_id=entity_id,
+                conflict_type=ctype,
+                severity=severity,
+                base_rule_id=lpa_rule.id,
+                conflicting_rule_id=ppm_rule.id,
+                base_rule_summary=f"LPA {label}: {lv}",
+                conflicting_rule_summary=f"PPM {label}: {pv}",
+                resolution="LPA governs; confirm PPM disclosure or amend. Human review required.",
+                requires_approval=True,
+            )
+        )
+
+    _maybe_conflict(
+        by_source(ClauseType.MANAGEMENT_FEE, DocumentType.LPA),
+        by_source(ClauseType.MANAGEMENT_FEE, DocumentType.PPM),
+        "fee_rate", "ppm_lpa_fee_mismatch", IssueSeverity.HIGH, "management fee",
+    )
+    _maybe_conflict(
+        by_source(ClauseType.INVESTMENT_MANDATE, DocumentType.LPA),
+        by_source(ClauseType.INVESTMENT_MANDATE, DocumentType.PPM),
+        "geography", "ppm_lpa_mandate_mismatch", IssueSeverity.HIGH, "investment geography",
+    )
+    for c in conflicts:
+        session.add(c)
+    session.flush()
+    return conflicts
+
+
+def _norm(v) -> str:
+    return str(v).strip().lower().replace(" ", "")
 
 
 def _conflict_exists(session: Session, base_id: int, conflicting_id: int) -> bool:

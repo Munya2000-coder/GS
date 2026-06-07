@@ -141,6 +141,7 @@ Dockerfile, docker-compose.yml
 | Dashboards | platform, fund, operations |
 | Exports | transactions.csv, trial-balance.csv, capital-accounts.csv, journal-entries.csv |
 | LPA Intelligence | `/lpa/documents` upload+extract, `/lpa/documents/{id}/blueprint` (Fund Logic Blueprint), `/lpa/rules` review/approve/reject, `/lpa/issues`, `/lpa/conflicts`, `/lpa/validate/{management-fee,capital-call,waterfall}` |
+| Fund Operating Pack | `/lpa/funds/{id}/operating-pack` (+ `.json`), `/lpa/funds/{id}/{fund-terms,reporting-matrix,investor-matrix,calendar,exceptions}`, `/lpa/funds/{id}/consistency-check`, CSV exports |
 | Audit | events, lineage upstream/downstream |
 | Admin | users provisioning, deactivate |
 | Reconciliation | batch recon, exception assignment |
@@ -217,6 +218,33 @@ the POC #1 functional requirements:
 > field is present and reserved for that next step. The two-screen UI
 > (drag-and-drop upload → split-screen blueprint/PDF with click-to-trace) is a
 > front-end build on top of this API.
+
+#### Fund Document Intelligence Workbench — Operating Logic Pack
+
+Beyond a single LPA, the Workbench ingests the whole fund document pack (LPA,
+PPM, side letters, subscription docs, investor register, bank memo, reporting
+templates — see `DocumentType`) under a document-authority hierarchy
+(`DOCUMENT_AUTHORITY`, spec §6), and assembles a governed **Fund Operating
+Logic Pack** via `GET /lpa/funds/{entity_id}/operating-pack`:
+
+- **Fund Terms Summary** — core attributes with source/confidence/traffic-light;
+  the *governing* document wins when sources disagree (LPA over PPM).
+- **Operating Rules (portable JSON)** — every rule with `plain_english_summary`,
+  `structured_rule`, `evidence_required`, and a citation.
+- **Investor Obligation Matrix** — per-investor side-letter intelligence
+  (custom reporting, restrictions, MFN, review-needed).
+- **Reporting Obligation Matrix** — fund-level + investor-specific obligations
+  (report, frequency, due date, recipient, source, owner, evidence).
+- **Obligation Calendar** — recurring rules turned into operating deadlines.
+- **Exception & Missing Terms Report** — missing required rules, side-letter
+  conflicts, and **PPM↔LPA consistency** mismatches (fee, mandate) flagged for
+  human review (`POST /lpa/funds/{id}/consistency-check`).
+
+New clause families extracted: investment mandate (asset class / geography /
+non-US permitted), tax reporting (K-1 / UBTI / ECI / FATCA), treasury (bank /
+wire / signatory), and ESG. Exports: full pack as JSON, matrices as CSV
+(Excel-ready). The pack is the spec's "Definition of Done" minus the front-end
+two-screen workbench, which builds on these endpoints.
 
 ## Design principles
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session
@@ -38,7 +38,8 @@ from app.schemas.lpa import (
     RuleRejection,
     WaterfallValidationRequest,
 )
-from app.services import lpa_blueprint, lpa_extraction, lpa_validation
+from app.services import lpa_blueprint, lpa_extraction, lpa_operating_pack, lpa_validation
+from app.services.exports import to_csv
 from app.services.lpa_parser import traffic_light
 
 router = APIRouter(prefix="/lpa", tags=["lpa"])
@@ -348,6 +349,139 @@ def resolve_conflict(
     session.commit()
     session.refresh(conflict)
     return conflict
+
+
+# --------------------------------------------------------------------------- #
+# Fund Operating Logic Pack                                                    #
+# --------------------------------------------------------------------------- #
+
+@router.get("/funds/{entity_id}/operating-pack")
+def get_operating_pack(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    """The complete Fund Operating Logic Pack: terms summary, portable rules,
+    investor & reporting obligation matrices, obligation calendar, and the
+    exception report."""
+    try:
+        return lpa_operating_pack.build_operating_pack(session, entity_id)
+    except ValueError as ex:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(ex))
+
+
+@router.get("/funds/{entity_id}/fund-terms")
+def get_fund_terms(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    return lpa_operating_pack.fund_terms_summary(session, entity_id)
+
+
+@router.get("/funds/{entity_id}/reporting-matrix")
+def get_reporting_matrix(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    return lpa_operating_pack.reporting_obligation_matrix(session, entity_id)
+
+
+@router.get("/funds/{entity_id}/investor-matrix")
+def get_investor_matrix(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    return lpa_operating_pack.investor_obligation_matrix(session, entity_id)
+
+
+@router.get("/funds/{entity_id}/calendar")
+def get_obligation_calendar(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    return lpa_operating_pack.obligation_calendar(session, entity_id)
+
+
+@router.get("/funds/{entity_id}/exceptions")
+def get_exceptions(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.READ)),
+):
+    return lpa_operating_pack.exception_report(session, entity_id)
+
+
+@router.post("/funds/{entity_id}/consistency-check")
+def run_consistency_check(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    user: AuthUser = Depends(require_permission(Permission.CREATE)),
+):
+    """Re-run PPM-vs-LPA (and cross-document) consistency checks and return any
+    newly-detected mismatches."""
+    conflicts = lpa_extraction.detect_consistency(session, entity_id)
+    session.commit()
+    return [
+        {
+            "id": c.id, "conflict_type": c.conflict_type, "severity": c.severity.value,
+            "base": c.base_rule_summary, "conflicting": c.conflicting_rule_summary,
+            "resolution": c.resolution,
+        }
+        for c in conflicts
+    ]
+
+
+@router.get("/funds/{entity_id}/operating-pack.json")
+def export_operating_pack_json(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    user: AuthUser = Depends(require_permission(Permission.EXPORT)),
+):
+    try:
+        pack = lpa_operating_pack.build_operating_pack(session, entity_id)
+    except ValueError as ex:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(ex))
+    body = json.dumps(pack, indent=2, default=str)
+    return Response(
+        content=body, media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="operating_pack_{pack["fund_id"]}.json"'},
+    )
+
+
+def _csv(body: str, filename: str) -> Response:
+    return Response(
+        content=body, media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/funds/{entity_id}/reporting-matrix.csv")
+def export_reporting_matrix_csv(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.EXPORT)),
+):
+    rows = lpa_operating_pack.reporting_obligation_matrix(session, entity_id)
+    headers = ["report", "frequency", "due_date", "recipient", "source", "owner", "investor_specific"]
+    body = to_csv(headers, [[r.get(h) for h in headers] for r in rows])
+    return _csv(body, f"reporting_matrix_{entity_id}.csv")
+
+
+@router.get("/funds/{entity_id}/investor-matrix.csv")
+def export_investor_matrix_csv(
+    entity_id: int,
+    session: Session = Depends(get_session),
+    _: AuthUser = Depends(require_permission(Permission.EXPORT)),
+):
+    rows = lpa_operating_pack.investor_obligation_matrix(session, entity_id)
+    headers = ["investor", "commitment", "side_letter", "custom_reporting",
+               "restriction", "tax_requirement", "notice_variant", "mfn", "review_needed"]
+    body = to_csv(headers, [[r.get(h) for h in headers] for r in rows])
+    return _csv(body, f"investor_matrix_{entity_id}.csv")
 
 
 # --------------------------------------------------------------------------- #

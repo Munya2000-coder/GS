@@ -118,7 +118,11 @@ _CLAUSE_KEYWORDS: dict[ClauseType, tuple[str, ...]] = {
     ClauseType.TAX_DISTRIBUTION: ("tax distribution", "tax advance"),
     ClauseType.FUND_EXPENSE: ("fund expenses", "organizational expenses", "organisational expenses", "partnership expenses"),
     ClauseType.INVESTMENT_PERIOD: ("investment period", "commitment period"),
-    ClauseType.INVESTMENT_RESTRICTION: ("investment restriction", "investment limitation", "concentration limit"),
+    ClauseType.INVESTMENT_RESTRICTION: ("investment restriction", "investment limitation", "concentration limit", "leverage limit", "prohibited investment"),
+    ClauseType.INVESTMENT_MANDATE: ("investment mandate", "investment objective", "investment strategy", "the fund shall invest", "invest primarily", "asset class"),
+    ClauseType.TAX_REPORTING: ("schedule k-1", "k-1", "ubti", "eci", "fatca", "crs", "tax reporting", "withholding"),
+    ClauseType.TREASURY: ("wire instructions", "banking relationship", "bank account", "cash management", "signatory", "treasury"),
+    ClauseType.ESG: ("esg", "environmental, social", "sustainability", "responsible investment"),
     ClauseType.PROFIT_LOSS_ALLOCATION: ("allocation of profits", "profits and losses", "capital account"),
     ClauseType.TRANSFER: ("transfer of interest", "assignment of interest", "permitted transfer"),
     ClauseType.WITHDRAWAL: ("withdrawal", "redemption"),
@@ -566,15 +570,30 @@ def _extract_fund_expense(s: Section) -> tuple[dict, Decimal, str]:
 
 def _extract_reporting(s: Section) -> tuple[dict, Decimal, str]:
     low = s.body.lower()
-    rtype = "audited_financial_statements" if "audit" in low else "investor_report"
+    if "audit" in low:
+        report_name = "Audited Financial Statements"
+    elif "capital account" in low:
+        report_name = "Capital Account Statement"
+    elif "financial statement" in low:
+        report_name = "Financial Statements"
+    elif "nav" in low or "net asset value" in low:
+        report_name = "NAV Statement"
+    else:
+        report_name = "Investor Report"
     freq = "annual" if "annual" in low else ("quarterly" if "quarter" in low else None)
     deadline = _first_days(s.body)
+    due_date_rule = (
+        f"{deadline}_days_after_period_end" if deadline is not None else None
+    )
     extracted = {
         "rule_type": "reporting_obligation",
-        "report_type": rtype,
+        "report_name": report_name,
         "frequency": freq,
         "deadline_days_after_period_end": deadline,
-        "recipient": "limited_partners",
+        "due_date_rule": due_date_rule,
+        "recipient": "all_limited_partners",
+        "responsible_party": "fund_admin",
+        "investor_specific": False,
         "source_clause": _section_ref(s),
     }
     found = 1 + (freq is not None) + (deadline is not None)
@@ -644,6 +663,95 @@ def _extract_profit_loss(s: Section) -> tuple[dict, Decimal, str]:
     return extracted, _confidence(1 + (len(specials) > 0), 2), "Book/tax allocation methodology."
 
 
+def _extract_investment_mandate(s: Section) -> tuple[dict, Decimal, str]:
+    low = s.body.lower()
+    asset_class = None
+    for label, key in (
+        ("real estate", "real_estate"),
+        ("private equity", "private_equity"),
+        ("infrastructure", "infrastructure"),
+        ("private credit", "private_credit"),
+        ("venture", "venture_capital"),
+    ):
+        if label in low:
+            asset_class = key
+            break
+    geography = None
+    non_us_permitted = None
+    if "united states" in low or "u.s." in low or "us-only" in low or "us only" in low:
+        geography = "United States"
+        non_us_permitted = not ("north america" in low or "global" in low or "non-us" in low)
+    elif "north america" in low:
+        geography = "North America"
+    elif "europe" in low:
+        geography = "Europe"
+    elif "global" in low:
+        geography = "Global"
+    extracted = {
+        "rule_type": "investment_mandate",
+        "asset_class": asset_class,
+        "geography": geography,
+        "non_us_investments_permitted": non_us_permitted,
+        "source_clause": _section_ref(s),
+    }
+    found = sum(x is not None for x in (asset_class, geography))
+    return extracted, _confidence(found, 2), "Defines the fund's permitted asset class and geography."
+
+
+def _extract_tax_reporting(s: Section) -> tuple[dict, Decimal, str]:
+    low = s.body.lower()
+    reports = [r for r, kw in (
+        ("schedule_k1", "k-1"),
+        ("ubti", "ubti"),
+        ("eci", "eci"),
+        ("withholding", "withholding"),
+        ("fatca", "fatca"),
+        ("crs", "crs"),
+        ("k1_estimate", "estimate"),
+    ) if kw in low]
+    extracted = {
+        "rule_type": "tax_reporting",
+        "reports": reports,
+        "frequency": "annual",
+        "source_clause": _section_ref(s),
+    }
+    return extracted, _confidence(min(len(reports), 2), 2), "Tax reporting obligations owed to investors."
+
+
+def _extract_treasury(s: Section) -> tuple[dict, Decimal, str]:
+    bank = None
+    # A proper-noun run of 1-4 capitalised tokens ending in Bank/Bankers/Trust,
+    # e.g. "AXZ Bankers" — without spilling across lowercase connecting words.
+    bm = re.search(
+        r"\b([A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*){0,3})\s+(Bank|Bankers|Trust)\b",
+        s.body,
+    )
+    if bm:
+        bank = f"{bm.group(1)} {bm.group(2)}".strip()
+    low = s.body.lower()
+    extracted = {
+        "rule_type": "treasury",
+        "bank": bank,
+        "wire_instructions_present": "wire" in low,
+        "signatory_matrix_present": "signatory" in low or "authorized signator" in low,
+        "source_clause": _section_ref(s),
+    }
+    found = (bank is not None) + extracted["wire_instructions_present"]
+    return extracted, _confidence(found, 2), "Treasury / banking relationship and cash controls."
+
+
+def _extract_esg(s: Section) -> tuple[dict, Decimal, str]:
+    low = s.body.lower()
+    extracted = {
+        "rule_type": "esg",
+        "esg_restriction": "exclud" in low or "restrict" in low or "prohibit" in low,
+        "esg_reporting": "report" in low or "disclos" in low,
+        "metrics_defined": "metric" in low or "kpi" in low,
+        "source_clause": _section_ref(s),
+    }
+    return extracted, _confidence(1, 2), "ESG restriction and/or reporting obligation."
+
+
 def _extract_fund_identity(s: Section) -> tuple[dict, Decimal, str]:
     name = None
     nm = re.search(
@@ -697,7 +805,65 @@ _EXTRACTORS = {
     ClauseType.TRANSFER: _extract_transfer,
     ClauseType.PROFIT_LOSS_ALLOCATION: _extract_profit_loss,
     ClauseType.FUND_IDENTITY: _extract_fund_identity,
+    ClauseType.INVESTMENT_MANDATE: _extract_investment_mandate,
+    ClauseType.TAX_REPORTING: _extract_tax_reporting,
+    ClauseType.TREASURY: _extract_treasury,
+    ClauseType.ESG: _extract_esg,
 }
+
+
+# Audit evidence each rule family must support (spec §9.2 / §13 evidence_required).
+EVIDENCE_REQUIRED: dict[ClauseType, list[str]] = {
+    ClauseType.MANAGEMENT_FEE: [
+        "management fee calculation", "approval evidence",
+        "journal entry support", "investor allocation schedule",
+    ],
+    ClauseType.CAPITAL_CALL: [
+        "approved call calculation", "notice package",
+        "wire instructions", "delivery confirmation",
+    ],
+    ClauseType.DISTRIBUTION_WATERFALL: [
+        "waterfall calculation", "approval evidence", "distribution notice",
+    ],
+    ClauseType.CARRIED_INTEREST: ["carry calculation", "approval evidence"],
+    ClauseType.CLAWBACK: ["clawback calculation", "escrow statement", "approval evidence"],
+    ClauseType.FUND_EXPENSE: ["accrual support", "vendor invoice", "approval evidence"],
+    ClauseType.REPORTING: ["report package", "approval record", "portal delivery confirmation"],
+    ClauseType.TAX_REPORTING: ["k-1 package", "tax workpapers", "approval record"],
+    ClauseType.TREASURY: ["bank setup packet", "signatory matrix", "wire approval"],
+    ClauseType.ESG: ["esg schedule", "metric definitions", "approval record"],
+}
+
+
+def _summarize(clause: ClauseType, ex: dict) -> str:
+    """Generate a plain-English summary of an extracted rule (spec §9.2)."""
+    if clause == ClauseType.MANAGEMENT_FEE:
+        base = (ex.get("fee_base") or "the stated base").replace("_", " ")
+        freq = (ex.get("frequency") or "periodically").replace("_", " ")
+        return f"Management fee of {ex.get('fee_rate') or 'n/a'} on {base}, charged {freq}."
+    if clause == ClauseType.PREFERRED_RETURN:
+        return f"Preferred return of {ex.get('rate') or 'n/a'} ({ex.get('calculation_basis') or 'basis n/a'})."
+    if clause == ClauseType.CARRIED_INTEREST:
+        return f"Carried interest of {ex.get('carry_percentage') or 'n/a'} to the GP, catch-up={ex.get('catch_up')}."
+    if clause == ClauseType.CAPITAL_CALL:
+        return f"Capital calls require {ex.get('notice_period_days') or 'n/a'} days notice."
+    if clause == ClauseType.INVESTMENT_MANDATE:
+        return f"Mandate: {ex.get('asset_class') or 'n/a'} in {ex.get('geography') or 'n/a'}."
+    if clause == ClauseType.REPORTING:
+        return f"{ex.get('report_name') or 'Report'} delivered {ex.get('frequency') or 'periodically'} to {ex.get('recipient') or 'LPs'}."
+    if clause == ClauseType.CLAWBACK:
+        return f"GP clawback on {ex.get('trigger') or 'trigger'}, net_of_tax={ex.get('net_of_tax')}."
+    if clause == ClauseType.FUND_EXPENSE:
+        return f"{(ex.get('expense_type') or 'fund expenses').replace('_', ' ')} allocated {(ex.get('allocation_basis') or '').replace('_', ' ')}."
+    if clause == ClauseType.TREASURY:
+        return f"Banking relationship: {ex.get('bank') or 'n/a'}."
+    if clause == ClauseType.TAX_REPORTING:
+        return f"Tax reporting: {', '.join(ex.get('reports') or []) or 'n/a'}."
+    if clause == ClauseType.ESG:
+        return "ESG obligation (restriction and/or reporting)."
+    if clause == ClauseType.FUND_IDENTITY:
+        return f"Fund {ex.get('fund_name') or ''} ({ex.get('currency') or 'n/a'}), term {ex.get('term_years') or 'n/a'} years."
+    return f"{clause.value.replace('_', ' ').title()} clause."
 
 
 def _section_ref(s: Section) -> str | None:
@@ -707,6 +873,7 @@ def _section_ref(s: Section) -> str | None:
 # Side-letter override detection — maps override intent to the LPA clause it
 # modifies, scoped to the document's investor.
 _SIDE_LETTER_OVERRIDES: tuple[tuple[str, ClauseType, str], ...] = (
+    ("esg", ClauseType.ESG, "esg_election"),
     ("management fee", ClauseType.MANAGEMENT_FEE, "management_fee_discount"),
     ("most favored nation", ClauseType.MFN, "mfn_election"),
     ("most favoured nation", ClauseType.MFN, "mfn_election"),
@@ -788,6 +955,10 @@ def extract_from_section(section: Section, document_type: DocumentType) -> RuleC
     # FR-3: attach the literal evidentiary sentence to the rule.
     verbatim = _verbatim(section.body, *_VERBATIM_HINTS.get(clause, ()))
     extracted["exact_extracted_text"] = verbatim
+    # spec §9.2: portable rule carries a plain-English summary + evidence list.
+    extracted["plain_english_summary"] = _summarize(clause, extracted)
+    if clause in EVIDENCE_REQUIRED:
+        extracted["evidence_required"] = EVIDENCE_REQUIRED[clause]
 
     # FR-4: discretionary phrases force the rule into the review band.
     ambiguity = _detect_ambiguity(section.body)
