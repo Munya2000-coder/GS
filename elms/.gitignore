@@ -1,5 +1,7 @@
 node_modules
 dist
+standalone
+ELMS-Training-System.html
 dist-ssr
 *.local
 .DS_Store
