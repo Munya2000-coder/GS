@@ -12,6 +12,7 @@ import { Evidence } from "./pages/Evidence";
 import { Overdue } from "./pages/Overdue";
 import { Reports } from "./pages/Reports";
 import { AnnualReviews } from "./pages/AnnualReviews";
+import { Incidents } from "./pages/Incidents";
 import { AuditLog } from "./pages/AuditLog";
 import { Notifications } from "./pages/Notifications";
 import { UserManagement } from "./pages/UserManagement";
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/overdue" element={<Overdue />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/reviews" element={<AnnualReviews />} />
+          <Route path="/incidents" element={<Incidents />} />
           <Route path="/audit" element={<AuditLog />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/users" element={<UserManagement />} />

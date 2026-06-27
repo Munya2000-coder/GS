@@ -5,6 +5,8 @@ import { Avatar, Badge, Button, Card, CardHead, CqcChip, Empty, Kpi, Tabs } from
 import { Icon } from "../components/Icon";
 import { cqcColor, fmtDate, relativeExpiry } from "../lib/domain";
 import { dueSoon, missingEvidence, overdue } from "../lib/analytics";
+import { AiPanel, AiThinking, useAiTask } from "../components/ai";
+import { aiLapseRisk, aiPlanTraining } from "../lib/ai";
 
 const REMINDER_STAGES = [
   { d: "90 days", who: "Ops & Training Manager notified · added to planner", tone: "blue" as const },
@@ -64,6 +66,11 @@ export function Overdue() {
         </div>
       </Card>
 
+      <div className="grid" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", marginBottom: 18 }}>
+        <LapseRiskAi />
+        <TrainingPlannerAi />
+      </div>
+
       <div style={{ marginBottom: 14 }}>
         <Tabs
           active={tab}
@@ -121,5 +128,98 @@ export function Overdue() {
         )}
       </Card>
     </>
+  );
+}
+
+function LapseRiskAi() {
+  const { computed, staff } = useStore();
+  const navigate = useNavigate();
+  const { loading, data, run } = useAiTask(() => aiLapseRisk(computed, staff));
+  const top = (data ?? []).filter((r) => r.band !== "low").slice(0, 5);
+
+  return (
+    <AiPanel
+      title="Lapse-risk radar"
+      sub="Predicts who is most likely to let mandatory training lapse"
+      icon="target"
+      right={
+        !data && (
+          <button className="btn ai sm" onClick={run} disabled={loading}>
+            <Icon name="sparkle" size={13} /> {loading ? "Scoring…" : "Predict"}
+          </button>
+        )
+      }
+    >
+      {!data && !loading && (
+        <div className="small" style={{ color: "#5b4b86" }}>
+          AI weighs overdue history, upcoming renewals, contract type and induction status to flag staff
+          to chase <i>before</i> they slip — so you act early, not late.
+        </div>
+      )}
+      {loading && <AiThinking label="Scoring lapse risk across the workforce…" />}
+      {data && (
+        <div className="col gap-8">
+          {top.length === 0 && <div className="small muted">No elevated-risk staff — the team is on track. 🎉</div>}
+          {top.map((r) => (
+            <div key={r.staff.id} className="ai-field" style={{ cursor: "pointer" }} onClick={() => navigate(`/staff/${r.staff.id}`)}>
+              <Avatar first={r.staff.firstName} last={r.staff.lastName} color={r.staff.avatarColor} size="sm" />
+              <div className="flex-1" style={{ minWidth: 0 }}>
+                <b className="small">{r.staff.firstName} {r.staff.lastName}</b>
+                <div className="tiny muted truncate">{r.drivers[0]}{r.drivers[1] ? ` · ${r.drivers[1]}` : ""}</div>
+              </div>
+              <span className={`risk-tag ${r.band}`}>{r.band === "high" ? "High" : "Medium"} · {r.score}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </AiPanel>
+  );
+}
+
+function TrainingPlannerAi() {
+  const { computed, pushToast } = useStore();
+  const { loading, data, run } = useAiTask(() => aiPlanTraining(computed));
+
+  return (
+    <AiPanel
+      title="Smart training planner"
+      sub="Groups upcoming renewals into cost-saving booking suggestions"
+      icon="stars"
+      right={
+        !data && (
+          <button className="btn ai sm" onClick={run} disabled={loading}>
+            <Icon name="sparkle" size={13} /> {loading ? "Planning…" : "Plan"}
+          </button>
+        )
+      }
+    >
+      {!data && !loading && (
+        <div className="small" style={{ color: "#5b4b86" }}>
+          AI clusters classroom &amp; provider-led renewals coming due into suggested group sessions —
+          fewer bookings, lower cost, less admin.
+        </div>
+      )}
+      {loading && <AiThinking label="Building the optimal training plan…" />}
+      {data && (
+        <div className="col gap-8">
+          {data.length === 0 && <div className="small muted">No provider-led sessions need booking right now.</div>}
+          {data.slice(0, 4).map((s) => (
+            <div key={s.module.id} className="ai-field">
+              <div className="flex-1" style={{ minWidth: 0 }}>
+                <b className="small">{s.module.title}</b>
+                <div className="tiny muted truncate">{s.count} staff · {s.suggestedDate} · {s.module.provider}</div>
+              </div>
+              <button
+                className="btn ai-outline sm"
+                style={{ flexShrink: 0 }}
+                onClick={() => pushToast({ kind: "success", title: "Session booked", body: `${s.module.title} — ${s.count} staff on ${s.suggestedDate}.` })}
+              >
+                <Icon name="calendar" size={13} /> Book
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </AiPanel>
   );
 }

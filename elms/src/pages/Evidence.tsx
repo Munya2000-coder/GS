@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../store/store";
-import { Avatar, Button, Card, CardHead, CqcChip, Empty, Field, Kpi, Modal, Tabs } from "../components/ui";
+import { Avatar, Badge, Button, Card, CardHead, CqcChip, Empty, Field, Kpi, Modal, Tabs } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { cqcColor, fmtDate } from "../lib/domain";
+import { AiChip, AiPanel, AiThinking, Confidence, useAiTask } from "../components/ai";
+import { aiExtractCertificate, type CertExtraction } from "../lib/ai";
 import type { ComputedRecord } from "../data/types";
 
 export function Evidence() {
@@ -20,6 +22,7 @@ export function Evidence() {
   }, [computed]);
 
   const list = groups[tab];
+  const [aiFor, setAiFor] = useState<ComputedRecord | null>(null);
 
   return (
     <>
@@ -62,6 +65,12 @@ export function Evidence() {
           ))}
         </div>
       </Card>
+
+      {tab === "pending" && groups.pending.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <AiTriage records={groups.pending} onReview={setAiFor} onApprove={approveRecord} />
+        </div>
+      )}
 
       <div style={{ marginBottom: 14 }}>
         <Tabs
@@ -116,6 +125,9 @@ export function Evidence() {
                     {!inspectionMode && tab === "pending" && (
                       <td>
                         <div className="row gap-8 end">
+                          <button className="btn ai-outline sm" onClick={() => setAiFor(r)}>
+                            <Icon name="sparkle" size={13} /> AI review
+                          </button>
                           <Button size="sm" variant="ghost" icon="x" onClick={() => setRejecting(r)}>Return</Button>
                           <Button size="sm" variant="primary" icon="check" onClick={() => approveRecord(r.id)}>Approve</Button>
                         </div>
@@ -142,7 +154,170 @@ export function Evidence() {
           }}
         />
       )}
+
+      {aiFor && (
+        <CertAiModal
+          rec={aiFor}
+          onClose={() => setAiFor(null)}
+          onApprove={() => { approveRecord(aiFor.id); setAiFor(null); }}
+          onReturn={() => { setRejecting(aiFor); setAiFor(null); }}
+        />
+      )}
     </>
+  );
+}
+
+function recBadgeTone(r: CertExtraction["recommendation"]) {
+  return r === "approve" ? "green" : r === "review" ? "amber" : "red";
+}
+function recLabel(r: CertExtraction["recommendation"]) {
+  return r === "approve" ? "Recommend approve" : r === "review" ? "Needs human check" : "Recommend return";
+}
+
+function AiTriage({
+  records,
+  onReview,
+  onApprove,
+}: {
+  records: ComputedRecord[];
+  onReview: (r: ComputedRecord) => void;
+  onApprove: (id: string) => void;
+}) {
+  const { pushToast } = useStore();
+  const { loading, data, run } = useAiTask(async () => {
+    const results = await Promise.all(records.map(async (r) => ({ rec: r, ex: await aiExtractCertificate(r) })));
+    return results;
+  });
+
+  const autoApprovable = data?.filter((d) => d.ex.recommendation === "approve") ?? [];
+
+  return (
+    <AiPanel
+      title="AI certificate triage"
+      sub="Reads each uploaded certificate, extracts the key fields and recommends a decision"
+      icon="scan"
+      right={
+        !data ? (
+          <button className="btn ai sm" onClick={run} disabled={loading}>
+            <Icon name="sparkle" size={13} /> {loading ? "Analysing…" : `Triage ${records.length}`}
+          </button>
+        ) : (
+          <AiChip label={`${data.length} analysed`} />
+        )
+      }
+    >
+      {!data && !loading && (
+        <div className="small" style={{ color: "#5b4b86" }}>
+          Run AI triage to auto-extract completion &amp; expiry dates, match each certificate to its module and
+          staff member, flag anomalies, and surface which submissions are safe to fast-track.
+        </div>
+      )}
+      {loading && <AiThinking label={`Reading ${records.length} certificates…`} />}
+      {data && (
+        <>
+          <div className="row gap-12 wrap" style={{ marginBottom: 14 }}>
+            <Badge tone="green" dot>{data.filter((d) => d.ex.recommendation === "approve").length} clear to approve</Badge>
+            <Badge tone="amber" dot>{data.filter((d) => d.ex.recommendation === "review").length} need a check</Badge>
+            <Badge tone="red" dot>{data.filter((d) => d.ex.recommendation === "return").length} recommend return</Badge>
+            {autoApprovable.length > 0 && (
+              <button
+                className="btn ai sm ml-auto"
+                onClick={() => {
+                  autoApprovable.forEach((d) => onApprove(d.rec.id));
+                  pushToast({ kind: "success", title: `${autoApprovable.length} certificates approved`, body: "AI-cleared submissions fast-tracked; statuses updated." });
+                }}
+              >
+                <Icon name="check" size={13} /> Apply {autoApprovable.length} approvals
+              </button>
+            )}
+          </div>
+          <div className="col gap-8">
+            {data.map(({ rec, ex }) => (
+              <div key={rec.id} className="ai-field" style={{ cursor: "pointer" }} onClick={() => onReview(rec)}>
+                <Avatar first={rec.staff.firstName} last={rec.staff.lastName} color={rec.staff.avatarColor} size="sm" />
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  <b className="small">{rec.staff.firstName} {rec.staff.lastName}</b>
+                  <div className="tiny muted truncate">{rec.module.title} · expires {fmtDate(ex.expiryDate)}{ex.flags.length ? ` · ${ex.flags[0]}` : ""}</div>
+                </div>
+                <span className={`badge ${recBadgeTone(ex.recommendation)}`} style={{ flexShrink: 0 }}>{recLabel(ex.recommendation)}</span>
+                <Icon name="chevronRight" size={15} style={{ color: "var(--muted-2)" }} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </AiPanel>
+  );
+}
+
+function CertAiModal({
+  rec,
+  onClose,
+  onApprove,
+  onReturn,
+}: {
+  rec: ComputedRecord;
+  onClose: () => void;
+  onApprove: () => void;
+  onReturn: () => void;
+}) {
+  const { loading, data, run } = useAiTask(() => aiExtractCertificate(rec));
+  useEffect(() => { run(); }, [run]);
+
+  return (
+    <Modal
+      title="AI certificate review"
+      icon="scan"
+      onClose={onClose}
+      footer={
+        <>
+          <Button onClick={onClose}>Close</Button>
+          <Button variant="ghost" icon="x" onClick={onReturn}>Return</Button>
+          <Button variant="primary" icon="check" onClick={onApprove}>Approve</Button>
+        </>
+      }
+    >
+      <div className="row gap-10" style={{ marginBottom: 14 }}>
+        <Avatar first={rec.staff.firstName} last={rec.staff.lastName} color={rec.staff.avatarColor} size="md" />
+        <div className="flex-1">
+          <b>{rec.staff.firstName} {rec.staff.lastName}</b>
+          <div className="tiny muted">{rec.module.title} · {rec.evidence?.fileName}</div>
+        </div>
+        <AiChip />
+      </div>
+
+      {loading || !data ? (
+        <AiThinking label="Reading the certificate…" />
+      ) : (
+        <div className="col gap-12">
+          <Confidence value={data.confidence} />
+          <div className="col gap-8">
+            <div className="ai-field"><span className="lbl">Learner</span><span className="val">{data.learnerName}</span></div>
+            <div className="ai-field"><span className="lbl">Course</span><span className="val">{data.course}</span></div>
+            <div className="ai-field"><span className="lbl">Provider</span><span className="val">{data.provider}</span></div>
+            <div className="ai-field"><span className="lbl">Completed</span><span className="val">{fmtDate(data.completionDate)}</span></div>
+            <div className="ai-field"><span className="lbl">Expires</span><span className="val">{fmtDate(data.expiryDate)}</span></div>
+          </div>
+          {data.flags.length > 0 && (
+            <div className="col gap-6">
+              {data.flags.map((f) => (
+                <div key={f} className="row gap-8 small" style={{ color: "var(--amber-ink)" }}>
+                  <Icon name="alert" size={15} /> {f}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="row gap-10" style={{ padding: 12, borderRadius: 9, background: data.recommendation === "approve" ? "var(--green-bg)" : data.recommendation === "review" ? "var(--amber-bg)" : "var(--red-bg)" }}>
+            <Icon name={data.recommendation === "approve" ? "checkCircle" : data.recommendation === "review" ? "eye" : "xCircle"} size={18} style={{ color: data.recommendation === "approve" ? "var(--green-ink)" : data.recommendation === "review" ? "var(--amber-ink)" : "var(--red-ink)", flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <b className="small">{recLabel(data.recommendation)}</b>
+              <div className="tiny" style={{ color: "var(--ink-2)" }}>{data.reason}</div>
+            </div>
+          </div>
+          <div className="tiny muted">AI suggestion only — the Operations Manager makes the final decision, and it is recorded in the audit trail.</div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

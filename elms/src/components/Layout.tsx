@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useStore } from "../store/store";
 import { Icon, type IconName } from "./Icon";
 import { ProgressRing } from "./ui";
+import { Assistant } from "./Assistant";
 import { compliancePct } from "../lib/analytics";
 import { pendingApprovals } from "../lib/analytics";
 import { ORG } from "../data/seed";
@@ -23,6 +24,7 @@ const PAGE_META: Record<string, { eyebrow: string; title: string }> = {
   "/overdue": { eyebrow: "Risk", title: "Overdue & Due Soon" },
   "/reports": { eyebrow: "Compliance", title: "Reports & CQC Export" },
   "/reviews": { eyebrow: "Governance", title: "Annual Review Log" },
+  "/incidents": { eyebrow: "Governance", title: "Incidents & Learning" },
   "/audit": { eyebrow: "Governance", title: "Audit Trail" },
   "/notifications": { eyebrow: "Activity", title: "Notifications" },
   "/users": { eyebrow: "Administration", title: "User Management" },
@@ -52,6 +54,7 @@ export function Layout() {
   ];
   const govNav: NavItem[] = [
     { to: "/reviews", label: "Annual Reviews", icon: "clipboard" },
+    { to: "/incidents", label: "Incidents & Learning", icon: "flag" },
     { to: "/audit", label: "Audit Trail", icon: "history" },
     { to: "/notifications", label: "Notifications", icon: "bell", badge: unread },
   ];
@@ -158,6 +161,8 @@ export function Layout() {
           <Outlet />
         </div>
       </main>
+
+      <Assistant />
     </div>
   );
 }

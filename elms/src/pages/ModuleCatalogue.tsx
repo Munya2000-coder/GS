@@ -3,6 +3,8 @@ import { useStore } from "../store/store";
 import { Badge, Button, Card, CqcChip, Field, Modal } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { CQC_DOMAINS, ROLE_LABELS, cqcColor } from "../lib/domain";
+import { AiChip, AiThinking, useAiTask } from "../components/ai";
+import { aiGenerateQuiz } from "../lib/ai";
 import type {
   CqcDomain,
   DeliveryMode,
@@ -34,6 +36,7 @@ export function ModuleCatalogue() {
   const { modules, computed, addModule, toggleModuleRetired, inspectionMode } = useStore();
   const [cat, setCat] = useState<string>("all");
   const [adding, setAdding] = useState(false);
+  const [quizFor, setQuizFor] = useState<TrainingModule | null>(null);
 
   const filtered = modules.filter((m) => cat === "all" || m.category === cat);
 
@@ -117,14 +120,104 @@ export function ModuleCatalogue() {
             </div>
             <div className="row between small" style={{ marginTop: 10 }}>
               <span className="muted">{usage(m.id)} staff assigned</span>
-              {m.provider && <span className="muted truncate" style={{ maxWidth: 140 }}>{m.provider}</span>}
+              {m.provider && <span className="muted truncate" style={{ maxWidth: 120 }}>{m.provider}</span>}
             </div>
+            <button className="btn ai-outline sm block" style={{ marginTop: 12 }} onClick={() => setQuizFor(m)}>
+              <Icon name="sparkle" size={13} /> Generate knowledge check
+            </button>
           </Card>
         ))}
       </div>
 
       {adding && <AddModuleModal onClose={() => setAdding(false)} onAdd={addModule} />}
+      {quizFor && <QuizModal module={quizFor} onClose={() => setQuizFor(null)} />}
     </>
+  );
+}
+
+function QuizModal({ module, onClose }: { module: TrainingModule; onClose: () => void }) {
+  const { pushToast } = useStore();
+  const { loading, data, run } = useAiTask(() => aiGenerateQuiz(module));
+  const [picks, setPicks] = useState<Record<number, number>>({});
+
+  return (
+    <Modal
+      title="AI knowledge check"
+      icon="brain"
+      drawer
+      onClose={onClose}
+      footer={
+        data ? (
+          <>
+            <Button onClick={onClose}>Close</Button>
+            <Button variant="primary" icon="send" onClick={() => { pushToast({ kind: "success", title: "Knowledge check assigned", body: `Sent to staff who completed ${module.title}.` }); onClose(); }}>
+              Assign to staff
+            </Button>
+          </>
+        ) : undefined
+      }
+    >
+      <div className="row gap-10" style={{ marginBottom: 16 }}>
+        <span className="badge outline mono">{module.code}</span>
+        <b className="flex-1">{module.title}</b>
+        <AiChip />
+      </div>
+
+      {!data && !loading && (
+        <div className="ai-panel" style={{ borderRadius: 10 }}>
+          <div className="ai-body col gap-12" style={{ alignItems: "flex-start" }}>
+            <div className="small" style={{ color: "#5b4b86" }}>
+              Generate a short multiple-choice knowledge check for this module — turning the tracker into
+              a lightweight learning tool. Answers are auto-marked.
+            </div>
+            <button className="btn ai" onClick={run}>
+              <Icon name="sparkle" size={15} /> Generate questions
+            </button>
+          </div>
+        </div>
+      )}
+      {loading && <AiThinking label="Writing questions for this module…" />}
+      {data && (
+        <div className="col gap-16">
+          {data.map((q, qi) => (
+            <div key={qi} className="card card-pad">
+              <b className="small" style={{ display: "block", marginBottom: 10 }}>{qi + 1}. {q.q}</b>
+              <div className="col gap-7">
+                {q.options.map((opt, oi) => {
+                  const picked = picks[qi] === oi;
+                  const correct = q.answer === oi;
+                  const reveal = picks[qi] !== undefined;
+                  return (
+                    <button
+                      key={oi}
+                      className="row gap-8"
+                      style={{
+                        textAlign: "left",
+                        padding: "9px 11px",
+                        borderRadius: 8,
+                        border: "1px solid " + (reveal && correct ? "var(--green)" : picked ? "var(--red)" : "var(--border)"),
+                        background: reveal && correct ? "var(--green-bg)" : picked && !correct ? "var(--red-bg)" : "#fff",
+                        font: "inherit",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => setPicks((p) => ({ ...p, [qi]: oi }))}
+                    >
+                      <span style={{ width: 18, flexShrink: 0, color: reveal && correct ? "var(--green)" : picked ? "var(--red)" : "var(--muted)" }}>
+                        {reveal && correct ? <Icon name="check" size={15} /> : picked ? <Icon name="x" size={15} /> : String.fromCharCode(65 + oi)}
+                      </span>
+                      <span className="small">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <button className="btn ai-outline sm" style={{ alignSelf: "flex-start" }} onClick={run}>
+            <Icon name="refresh" size={13} /> Regenerate
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 }
 

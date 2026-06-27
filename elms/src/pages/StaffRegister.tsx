@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store/store";
 import { Avatar, Badge, Button, Card, Field, Meter, Modal } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { compliancePct } from "../lib/analytics";
 import { ROLE_LABELS, daysToExpiry } from "../lib/domain";
+import { AiPanel, AiThinking, useAiTask } from "../components/ai";
+import { think } from "../lib/ai";
 import type { ContractType, RoleKey, Staff } from "../data/types";
 import { ORG } from "../data/seed";
 
@@ -193,6 +195,20 @@ function AddStaffModal({
       }
     >
       <div className="col gap-16">
+        <NewStarterAi
+          onFill={(d) =>
+            setForm((f) => ({
+              ...f,
+              firstName: d.firstName,
+              lastName: d.lastName,
+              role: d.role,
+              email: d.email,
+              dbsExpiry: d.dbsExpiry,
+              rightToWorkExpiry: d.rightToWorkExpiry,
+              startDate: d.startDate,
+            }))
+          }
+        />
         <div className="row gap-12">
           <Field label="First name"><input className="input" value={form.firstName} onChange={(e) => set("firstName", e.target.value)} /></Field>
           <Field label="Last name"><input className="input" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} /></Field>
@@ -232,5 +248,68 @@ function AddStaffModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+interface ExtractedStarter {
+  firstName: string;
+  lastName: string;
+  role: RoleKey;
+  email: string;
+  dbsExpiry: string;
+  rightToWorkExpiry: string;
+  startDate: string;
+}
+
+function NewStarterAi({ onFill }: { onFill: (d: ExtractedStarter) => void }) {
+  const sample: ExtractedStarter = {
+    firstName: "Aisha",
+    lastName: "Begum",
+    role: "care_worker",
+    email: "aisha.begum@elmshealth.co.uk",
+    dbsExpiry: "2029-05-14",
+    rightToWorkExpiry: "2028-11-30",
+    startDate: "2026-07-06",
+  };
+  const { loading, data, run } = useAiTask(() => think(sample, 1100));
+  useEffect(() => { if (data) onFill(data); }, [data, onFill]);
+
+  return (
+    <AiPanel
+      title="Scan onboarding documents"
+      sub="Extract details from a DBS, passport or right-to-work document"
+      icon="scan"
+      right={
+        !data && (
+          <button className="btn ai sm" onClick={run} disabled={loading}>
+            <Icon name="sparkle" size={13} /> {loading ? "Reading…" : "Scan & autofill"}
+          </button>
+        )
+      }
+    >
+      {!data && !loading && (
+        <div className="small" style={{ color: "#5b4b86" }}>
+          Upload a new starter's documents and AI will read the name, role, DBS and right-to-work
+          expiry dates and pre-fill the form below — you just confirm.
+        </div>
+      )}
+      {loading && <AiThinking label="Extracting fields from documents…" />}
+      {data && (
+        <div className="col gap-8">
+          <div className="row gap-8 small" style={{ color: "var(--green-ink)", fontWeight: 600 }}>
+            <Icon name="checkCircle" size={15} /> Extracted &amp; applied to the form below
+          </div>
+          <div className="row gap-8 wrap tiny" style={{ color: "#5b4b86" }}>
+            <span className="ai-chip soft">{data.firstName} {data.lastName}</span>
+            <span className="ai-chip soft">{ROLE_LABELS[data.role]}</span>
+            <span className="ai-chip soft">DBS → {data.dbsExpiry}</span>
+            <span className="ai-chip soft">RTW → {data.rightToWorkExpiry}</span>
+          </div>
+          <button className="btn ai-outline sm" style={{ alignSelf: "flex-start" }} onClick={run}>
+            <Icon name="refresh" size={13} /> Re-scan
+          </button>
+        </div>
+      )}
+    </AiPanel>
   );
 }

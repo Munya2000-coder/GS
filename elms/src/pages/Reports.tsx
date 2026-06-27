@@ -4,6 +4,8 @@ import { Badge, Button, Card, CqcChip, Field, Meter, Modal } from "../components
 import { Icon, type IconName } from "../components/Icon";
 import { byDomain, compliancePct, missingEvidence, overdue } from "../lib/analytics";
 import { fmtDate } from "../lib/domain";
+import { AiChip, AiPanel, AiThinking, useAiTask } from "../components/ai";
+import { aiCqcNarrative, aiInspectionSummary } from "../lib/ai";
 
 const REPORTS: { id: string; title: string; desc: string; icon: IconName; tone: string }[] = [
   { id: "matrix", title: "Full training matrix", desc: "Every staff member against every applicable module with RAG status.", icon: "matrix", tone: "brand" },
@@ -89,6 +91,10 @@ export function Reports() {
         </div>
       </Card>
 
+      <div style={{ marginBottom: 18 }}>
+        <CqcNarrativeAi />
+      </div>
+
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))" }}>
         {REPORTS.map((r) => {
           const t = TONE_BG[r.tone];
@@ -116,6 +122,71 @@ export function Reports() {
 
       {inspectModal && <InspectionAccessModal onClose={() => setInspectModal(false)} />}
     </>
+  );
+}
+
+function CqcNarrativeAi() {
+  const { computed, staff, pushToast } = useStore();
+  const narrative = useAiTask(() => aiCqcNarrative(computed));
+  const summary = useAiTask(() => aiInspectionSummary(computed, staff.filter((s) => s.employmentStatus !== "Left").length));
+
+  const run = () => { narrative.run(); summary.run(); };
+  const busy = narrative.loading || summary.loading;
+  const has = narrative.data || summary.data;
+
+  return (
+    <AiPanel
+      title="AI inspection narrative"
+      sub="Auto-drafts the evidence-pack commentary, mapped to the five CQC key questions"
+      icon="brain"
+      right={
+        !has ? (
+          <button className="btn ai sm" onClick={run} disabled={busy}>
+            <Icon name="sparkle" size={13} /> {busy ? "Drafting…" : "Draft narrative"}
+          </button>
+        ) : (
+          <button className="btn ai-outline sm" onClick={() => pushToast({ kind: "success", title: "Narrative added to pack", body: "The AI commentary is included in the CQC evidence export." })}>
+            <Icon name="plus" size={13} /> Add to pack
+          </button>
+        )
+      }
+    >
+      {!has && !busy && (
+        <div className="small" style={{ color: "#5b4b86" }}>
+          Generate a plain-English summary an inspector expects — overall readiness plus a paragraph
+          per key question — written from your live data and ready to drop into the evidence pack.
+        </div>
+      )}
+      {busy && <AiThinking label="Writing the inspection narrative…" />}
+      {summary.data && (
+        <div style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(124,58,237,0.14)", borderRadius: 10, padding: "12px 14px", marginBottom: narrative.data ? 14 : 0 }}>
+          <div className="row gap-8" style={{ marginBottom: 6 }}>
+            <Icon name="award" size={15} style={{ color: "var(--ai-1)" }} />
+            <b className="small" style={{ color: "#3a2a6b" }}>Executive summary</b>
+          </div>
+          <p className="small" style={{ margin: 0, color: "var(--ink-2)", lineHeight: 1.6 }}>{summary.data}</p>
+        </div>
+      )}
+      {narrative.data && (
+        <div className="col gap-10">
+          {narrative.data.map((d) => (
+            <div key={d.domain} className="row gap-12 items-start" style={{ background: "rgba(255,255,255,0.6)", borderRadius: 10, padding: "11px 13px" }}>
+              <span style={{ width: 9, height: 9, borderRadius: "50%", background: d.color, marginTop: 5, flexShrink: 0 }} />
+              <div className="flex-1">
+                <div className="row gap-8" style={{ marginBottom: 2 }}>
+                  <b className="small">{d.domain}</b>
+                  <span className="tiny mono" style={{ color: "var(--muted)" }}>{d.pct}%</span>
+                </div>
+                <p className="small" style={{ margin: 0, color: "var(--ink-2)", lineHeight: 1.55 }}>{d.text}</p>
+              </div>
+            </div>
+          ))}
+          <div className="row gap-6 tiny muted" style={{ marginTop: 2 }}>
+            <AiChip label="AI-generated" /> Review before sharing — drafted from live data, not a substitute for your professional judgement.
+          </div>
+        </div>
+      )}
+    </AiPanel>
   );
 }
 

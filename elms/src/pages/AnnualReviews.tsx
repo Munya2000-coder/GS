@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../store/store";
 import { Badge, Button, Card, CardHead, CqcChip, Field, Kpi, Modal } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { cqcColor, fmtDate, fmtDateLong } from "../lib/domain";
 import type { CqcDomain } from "../data/types";
 import { CQC_DOMAINS } from "../lib/domain";
+import { AiThinking, useAiTask } from "../components/ai";
+import { aiDraftReview } from "../lib/ai";
 
 export function AnnualReviews() {
   const { reviews, signOffReview, inspectionMode } = useStore();
@@ -74,10 +76,19 @@ export function AnnualReviews() {
 }
 
 function AddReviewModal({ onClose }: { onClose: () => void }) {
-  const { pushToast } = useStore();
+  const { pushToast, modules } = useStore();
   const [scope, setScope] = useState("");
   const [changes, setChanges] = useState("");
   const [domains, setDomains] = useState<CqcDomain[]>([]);
+  const draft = useAiTask(() => aiDraftReview(modules));
+
+  useEffect(() => {
+    if (draft.data) {
+      setScope(draft.data.scope);
+      setChanges(draft.data.changes);
+      setDomains(draft.data.domains);
+    }
+  }, [draft.data]);
 
   return (
     <Modal
@@ -103,6 +114,24 @@ function AddReviewModal({ onClose }: { onClose: () => void }) {
       }
     >
       <div className="col gap-16">
+        <div className="ai-panel" style={{ borderRadius: 10 }}>
+          <div className="ai-body row gap-12 between" style={{ padding: 13 }}>
+            <div className="row gap-10">
+              <span className="ai-mark"><Icon name="brain" size={16} /></span>
+              <div>
+                <b className="small" style={{ color: "#3a2a6b" }}>Draft this review with AI</b>
+                <div className="tiny" style={{ color: "#6b5e9b" }}>Summarises catalogue changes &amp; affected domains</div>
+              </div>
+            </div>
+            {!draft.loading ? (
+              <button className="btn ai sm" onClick={draft.run}>
+                <Icon name="sparkle" size={13} /> {draft.data ? "Redraft" : "Generate"}
+              </button>
+            ) : (
+              <AiThinking label="Drafting…" />
+            )}
+          </div>
+        </div>
         <Field label="Review scope"><input className="input" value={scope} onChange={(e) => setScope(e.target.value)} placeholder="e.g. Full training matrix — all roles" /></Field>
         <Field label="Changes made"><textarea className="textarea" value={changes} onChange={(e) => setChanges(e.target.value)} placeholder="Describe modules added, retired or re-mapped…" /></Field>
         <Field label="CQC domains affected">
