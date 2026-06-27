@@ -7,6 +7,11 @@ automated, easy-to-use system.
 This is a polished, fully-interactive front-end built to the attached PRD, with
 a realistic in-memory data layer so every screen is usable end-to-end.
 
+> **👩‍💻 Developers:** the full developer package lives in **[`docs/`](./docs/)** —
+> a [setup & how-to-edit guide](./docs/DEVELOPER_GUIDE.md), an
+> [architecture overview](./docs/ARCHITECTURE.md), and a complete
+> [function-by-function reference](./docs/FUNCTION-REFERENCE.md).
+
 ## Highlights
 
 - **Crisp, accessible design system** — light healthcare-grade theme, Inter
