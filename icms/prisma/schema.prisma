@@ -1,0 +1,459 @@
+// ICMS — Immigration Compliance Management System
+// Core relational data model (PRD §12).
+//
+// Dev datasource is SQLite for zero-config local runs. The PRD targets
+// Azure Database for PostgreSQL Flexible Server — switch `provider` to
+// "postgresql" and point DATABASE_URL at Postgres for staging/production.
+// SQLite has no native enums/arrays, so enumerated values are stored as
+// String with the allowed set documented in comments next to each field.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Identity & access (PRD §7.2, Module 19/20)
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  entraOid     String?  @unique // Entra ID subject (oid) when SSO is wired; null for dev/self-service
+  email        String   @unique
+  displayName  String
+  // Pipe-separated role keys (see lib/rbac). e.g. "AUTHORISING_OFFICER|COMPLIANCE_MANAGER"
+  roles        String   @default("")
+  siteScope    String?  // optional site restriction (Cambridge|Norwich), null = all sites
+  isActive     Boolean  @default(true)
+  isExternal   Boolean  @default(false) // legal adviser / inspector / worker self-service
+  accessExpiresAt DateTime? // for time-limited inspector / legal adviser accounts (PRD ICMS-079/102)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  approvals    CosApproval[]
+  auditEntries AuditTrail[]  @relation("AuditActor")
+}
+
+// ---------------------------------------------------------------------------
+// Sponsor licence governance (Module 1)
+// ---------------------------------------------------------------------------
+
+model Organisation {
+  id                String   @id @default(cuid())
+  legalName         String
+  tradingNames      String?
+  companiesHouseNo  String?
+  cqcProviderId     String?
+  cqcRating         String?  // Good | Requires Improvement | ...
+  sites             String?  // JSON array of {name, address, postcode}
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  licences          SponsorLicence[]
+}
+
+model SponsorLicence {
+  id              String   @id @default(cuid())
+  organisationId  String
+  organisation    Organisation @relation(fields: [organisationId], references: [id])
+  licenceNumber   String
+  rating          String   // A | B (downgraded)
+  licenceType     String   // Worker | Temporary Worker
+  route           String   // Skilled Worker | Health and Care Worker
+  expiryDate      DateTime
+  renewalDeadline DateTime?
+  authorisingOfficer String?
+  keyContact      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  smsUsers        SmsUser[]
+}
+
+model SmsUser {
+  id              String   @id @default(cuid())
+  licenceId       String
+  licence         SponsorLicence @relation(fields: [licenceId], references: [id])
+  name            String
+  level           String   // Level 1 | Level 2
+  email           String?
+  dateAdded       DateTime @default(now())
+  lastReviewedAt  DateTime?
+  removedAt       DateTime?
+  isLeaver        Boolean  @default(false) // ICMS-004: flag SMS access for removal
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Sponsored worker master record (Module 5)
+// ---------------------------------------------------------------------------
+
+model Worker {
+  id              String   @id @default(cuid())
+  wcid            String   @unique // Worker Compliance ID (ICMS-024)
+  // Personal
+  legalName       String
+  dateOfBirth     DateTime?
+  nationality     String?
+  passportNumber  String?
+  passportExpiry  DateTime?
+  niNumber        String?
+  email           String?
+  phone           String?
+  address         String?
+  // Employment
+  jobTitle        String?
+  socCode         String?  // SOC/occupation code
+  workLocation    String?  // Cambridge | Norwich
+  lineManager     String?
+  contractedHours Float?
+  salary          Float?   // annual
+  hourlyRate      Float?
+  employmentStart DateTime?
+  employmentEnd   DateTime?
+  // Sponsorship
+  sponsorshipStatus String @default("Active") // Active | Pre-Start | Ended | Suspended
+  // Live compliance (Module 14) — recomputed by lib/compliance-score
+  complianceScore Int      @default(0)
+  ragStatus       String   @default("Red") // Green | Amber | Red | Critical
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  visas           Visa[]
+  rtwChecks       RightToWorkCheck[]
+  cosRecords      Cos[]
+  documents       Document[]
+  appendixD       AppendixDItem[]
+  reportableEvents ReportableEvent[]
+  carePackageLinks CarePackageAllocation[]
+  payrollRecords  PayrollRecord[]
+  fieldHistory    WorkerFieldChange[]
+}
+
+// Immutable per-field change history (ICMS-025)
+model WorkerFieldChange {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  field       String
+  oldValue    String?
+  newValue    String?
+  reason      String?
+  changedBy   String
+  changedAt   DateTime @default(now())
+}
+
+model Visa {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  route       String   // Skilled Worker | Health and Care Worker
+  cosNumber   String?
+  startDate   DateTime?
+  expiryDate  DateTime
+  evisaRef    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Right to work (Module 6)
+// ---------------------------------------------------------------------------
+
+model RightToWorkCheck {
+  id              String   @id @default(cuid())
+  workerId        String
+  worker          Worker   @relation(fields: [workerId], references: [id])
+  checkType       String   @default("Home Office online check")
+  shareCode       String?
+  checkDate       DateTime
+  checkedBy       String
+  permission      String?  // immigration permission granted
+  restrictions    String?  // work restrictions
+  repeatCheckDate DateTime? // follow-up date
+  evidenceDocId   String?
+  status          String   @default("Valid") // Valid | Expired | Unreviewed
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Certificate of Sponsorship + gated approval workflow (Modules 2 & 7)
+// ---------------------------------------------------------------------------
+
+model Cos {
+  id              String   @id @default(cuid())
+  cosNumber       String?  @unique // assigned once issued; null while in draft
+  workerId        String?
+  worker          Worker?  @relation(fields: [workerId], references: [id])
+  cosType         String   @default("Defined") // Defined | Undefined
+  jobTitle        String
+  socCode         String
+  workLocation    String
+  contractedHours Float
+  salary          Float
+  hourlyRate      Float?
+  proposedStart   DateTime?
+  proposedEnd     DateTime?
+  candidateName   String?
+  businessJustification String?
+  carePackageJustification String?
+  fundingSource   String?
+  // Workflow state (ICMS-031)
+  status          String   @default("Draft") // Draft | Pending Approval | Approved | Assigned | Used | Worker Started | Worker Did Not Start | Withdrawn | Expired | Sponsorship Ended | Rejected
+  currentStage    Int      @default(0) // 0=not started, 1..5 per approval sequence
+  submittedById   String?  // separation of duties (ICMS-011)
+  isEmergency     Boolean  @default(false) // ICMS-013 override
+  emergencyReason String?
+  assignedDate    DateTime?
+  expiryDate      DateTime?
+  smsReference    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  approvals       CosApproval[]
+  genuineVacancy  GenuineVacancy?
+}
+
+// Immutable approval-stage records (ICMS-008/009/010)
+model CosApproval {
+  id          String   @id @default(cuid())
+  cosId       String
+  cos         Cos      @relation(fields: [cosId], references: [id])
+  stage       Int      // 1=Hiring Manager 2=HR 3=Finance 4=Compliance 5=AO
+  stageName   String
+  approverId  String?
+  approver    User?    @relation(fields: [approverId], references: [id])
+  approverName String?
+  approverRole String?
+  decision    String?  // approved | rejected | returned
+  comments    String?
+  decidedAt   DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Genuine vacancy + recruitment evidence (Modules 3 & 4)
+// ---------------------------------------------------------------------------
+
+model GenuineVacancy {
+  id              String   @id @default(cuid())
+  cosId           String   @unique
+  cos             Cos      @relation(fields: [cosId], references: [id])
+  vacancyReason   String?
+  careService     String?
+  hoursCommissioned Float?
+  hoursDelivered  Float?
+  currentEstablishment Int?
+  staffingGap     Float?
+  isJustified     Boolean  @default(false)
+  evidenceComplete Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Documents + Appendix D checklist (Modules 12 & 13)
+// ---------------------------------------------------------------------------
+
+model Document {
+  id          String   @id @default(cuid())
+  workerId    String?
+  worker      Worker?  @relation(fields: [workerId], references: [id])
+  category    String   // passport | visa | rtw | contract | dbs | payslip | ...
+  fileName    String
+  storagePath String   // adapter key (local disk now, Azure Blob later)
+  mimeType    String?
+  sizeBytes   Int?
+  version     Int      @default(1)
+  status      String   @default("Uploaded (pending review)") // Required | Uploaded (pending review) | Approved | Missing | Expired | Not Applicable | Rejected
+  expiryDate  DateTime?
+  uploadedBy  String
+  reviewedBy  String?
+  reviewedAt  DateTime?
+  supersedesId String? // previous version reference
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AppendixDItem {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  key         String   // stable item key, e.g. "passport"
+  label       String
+  status      String   @default("Required") // Required | Uploaded (pending review) | Approved | Missing | Expired | Not Applicable | Rejected
+  documentId  String?  // linked document when uploaded
+  expiryDate  DateTime?
+  required    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workerId, key])
+}
+
+// ---------------------------------------------------------------------------
+// SMS reporting (Module 11)
+// ---------------------------------------------------------------------------
+
+model ReportableEvent {
+  id          String   @id @default(cuid())
+  workerId    String?
+  worker      Worker?  @relation(fields: [workerId], references: [id])
+  eventType   String   // see PRD ICMS-052 list
+  eventDate   DateTime
+  reportingDeadline DateTime
+  ownerName   String?
+  // Lifecycle (ICMS-054): Identified | Investigated | AO Approved | SMS Submitted | Closed
+  status      String   @default("Identified")
+  smsReference String? // required to close (ICMS-055)
+  smsEvidenceDocId String?
+  closedAt    DateTime?
+  autoCreated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Care sector evidence (Module 23)
+// ---------------------------------------------------------------------------
+
+model CarePackage {
+  id              String   @id @default(cuid())
+  serviceCode     String
+  commissioner    String?  // local authority | ICB | private
+  contractRef     String?
+  hoursCommissioned Float?
+  hoursDelivered  Float?
+  requiredStaffing Float?
+  serviceLocation String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  allocations     CarePackageAllocation[]
+}
+
+model CarePackageAllocation {
+  id            String   @id @default(cuid())
+  carePackageId String
+  carePackage   CarePackage @relation(fields: [carePackageId], references: [id])
+  workerId      String
+  worker        Worker   @relation(fields: [workerId], references: [id])
+  isSponsored   Boolean  @default(true)
+
+  @@unique([carePackageId, workerId])
+}
+
+// ---------------------------------------------------------------------------
+// Payroll reconciliation (Module 9)
+// ---------------------------------------------------------------------------
+
+model PayrollRecord {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  payPeriod   String   // YYYY-MM
+  grossPay    Float?
+  hoursPaid   Float?
+  exception   String?  // null = clean; else exception type
+  resolved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Audit, CAPA, risk (Modules 16/17 & Risk Register)
+// ---------------------------------------------------------------------------
+
+model AuditFinding {
+  id          String   @id @default(cuid())
+  reference   String   @unique
+  category    String   // Critical | Major | Minor | Observation | Good Practice
+  description String
+  rootCause   String?
+  owner       String?
+  dueDate     DateTime?
+  status      String   @default("Open") // Open | In Progress | Closed
+  closureEvidence String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  capa        Capa?
+}
+
+model Capa {
+  id              String   @id @default(cuid())
+  reference       String   @unique
+  findingId       String?  @unique
+  finding         AuditFinding? @relation(fields: [findingId], references: [id])
+  rootCause       String?
+  correctiveAction String?
+  preventiveAction String?
+  owner           String?
+  dueDate         DateTime?
+  status          String   @default("Open") // Open | In Progress | Closed
+  evidence        String?
+  effectivenessCheck String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RiskRegisterEntry {
+  id          String   @id @default(cuid())
+  description String
+  owner       String?
+  likelihood  String?  // Low | Medium | High
+  impact      String?  // Low | Medium | High | Critical
+  mitigation  String?
+  reviewDate  DateTime?
+  status      String   @default("Open")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Tamper-evident audit trail (Module 20)
+// ---------------------------------------------------------------------------
+
+model AuditTrail {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actor       User?    @relation("AuditActor", fields: [actorId], references: [id])
+  actorName   String
+  action      String   // e.g. cos.approve, document.upload, worker.update
+  entityType  String
+  entityId    String?
+  summary     String
+  oldValue    String?
+  newValue    String?
+  reason      String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Alerts (Module 21)
+// ---------------------------------------------------------------------------
+
+model Alert {
+  id          String   @id @default(cuid())
+  alertType   String
+  severity    String   @default("info") // info | warning | critical
+  channel     String   @default("dashboard") // dashboard | email | teams | push
+  recipient   String?
+  subject     String
+  body        String?
+  entityType  String?
+  entityId    String?
+  sentAt      DateTime @default(now())
+  acknowledgedAt DateTime?
+}

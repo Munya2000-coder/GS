@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Mapped to ELMS brand palette (PRD §8.1) expressed as HSL for shadcn tokens. */
+    --background: 0 0% 100%; /* #FFFFFF */
+    --foreground: 210 41% 18%; /* #1A2D3F navy */
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 41% 18%;
+
+    --primary: 174 100% 33%; /* #00A99D teal */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 17% 96%; /* #F4F6F8 light grey */
+    --secondary-foreground: 210 41% 18%;
+
+    --muted: 210 17% 96%;
+    --muted-foreground: 220 9% 64%; /* #9CA3AF */
+
+    --accent: 173 60% 92%; /* #E0F5F3 light teal */
+    --accent-foreground: 210 41% 18%;
+
+    --destructive: 0 84% 60%; /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 174 100% 33%;
+
+    --radius: 0.5rem;
+
+    --font-inter: "Inter", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-secondary text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Thin scrollbar for the dense compliance tables */
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+}
