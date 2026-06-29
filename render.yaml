@@ -1,0 +1,21 @@
+# Render Blueprint — one-click deploy of the ICMS app (in ./icms).
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: icms
+    runtime: docker
+    repo: https://github.com/Munya2000-coder/GS
+    branch: claude/fervent-cannon-do0e57
+    dockerfilePath: ./icms/Dockerfile
+    dockerContext: ./icms
+    plan: free
+    autoDeploy: false
+    envVars:
+      - key: AUTH_MODE
+        value: dev
+      - key: DATABASE_URL
+        value: file:./prisma/prod.db
+      - key: STORAGE_MODE
+        value: local
+      - key: ALERT_MODE
+        value: log
