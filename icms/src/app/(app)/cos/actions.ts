@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { sendAlert } from "@/lib/alerts";
 import { COS_STAGES } from "@/lib/rbac";
+import { checkSalaryCompliance } from "@/lib/salary-compliance";
 
 /**
  * Advance / reject / return a CoS approval stage (PRD Module 2).
@@ -38,6 +39,19 @@ export async function actionCosStage(formData: FormData) {
   // Per-stage RBAC.
   if (!user.permissions.has(stageDef.permission)) {
     throw new Error(`FORBIDDEN: your role cannot action the "${current.stageName}" stage`);
+  }
+
+  // Salary & hours compliance gate at the Finance stage (ICMS-034,035).
+  if (current.stage === 3 && decision === "approved") {
+    const salary = await checkSalaryCompliance({
+      socCode: cos.socCode,
+      salary: cos.salary,
+      contractedHours: cos.contractedHours,
+    });
+    if (salary.blocking) {
+      const failed = salary.checks.filter((c) => !c.pass).map((c) => c.label).join(", ");
+      throw new Error(`Cannot approve: salary below mandatory threshold (${failed}). Override requires documented Compliance Manager exception (ICMS-035).`);
+    }
   }
 
   // Separation of duties at final AO approval (ICMS-011).

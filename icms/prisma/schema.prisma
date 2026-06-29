@@ -134,6 +134,8 @@ model Worker {
   carePackageLinks CarePackageAllocation[]
   payrollRecords  PayrollRecord[]
   fieldHistory    WorkerFieldChange[]
+  recruitmentRecord RecruitmentRecord?
+  rotaShifts      RotaShift[]
 }
 
 // Immutable per-field change history (ICMS-025)
@@ -361,10 +363,72 @@ model PayrollRecord {
   payPeriod   String   // YYYY-MM
   grossPay    Float?
   hoursPaid   Float?
+  expectedGross Float?  // derived from CoS salary for the period
   exception   String?  // null = clean; else exception type
+  investigation String? // documented investigation note (ICMS-042)
   resolved    Boolean  @default(false)
+  resolvedBy  String?
+  reconciliationId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Monthly payroll reconciliation run (PRD ICMS-044)
+model PayrollReconciliation {
+  id              String   @id @default(cuid())
+  period          String   @unique // YYYY-MM
+  runAt           DateTime @default(now())
+  runBy           String?
+  totalRecords    Int      @default(0)
+  exceptionsCount Int      @default(0)
+  status          String   @default("Open") // Open | Completed
+  summary         String?  // JSON breakdown
+}
+
+// CareLineLive rota/shift import (PRD Module 10 / ICMS-046)
+model RotaShift {
+  id          String   @id @default(cuid())
+  workerId    String
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  shiftDate   DateTime
+  plannedHours Float
+  actualHours Float?
+  clientRef   String?
+  status      String   @default("Scheduled") // Scheduled | Completed | No Show | Cancelled | Absent | Sickness | Annual Leave
+  source      String   @default("CareLineLive")
+  createdAt   DateTime @default(now())
+}
+
+// Recruitment evidence (PRD Module 4 / ICMS-020,021)
+model RecruitmentRecord {
+  id          String   @id @default(cuid())
+  workerId    String   @unique
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  cosId       String?
+  // Per-document status map, JSON: { advert: "Approved", jd: "Missing", ... }
+  items       String   @default("{}")
+  selectionJustification String?
+  exceptionApproved Boolean @default(false)  // Compliance Manager exception (ICMS-021)
+  exceptionApprovedBy String?
+  complete    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// System configuration (PRD §17) — all changes require approval + audit trail.
+model Configuration {
+  id          String   @id @default(cuid())
+  category    String   // salary_thresholds | alert_periods | score_weights | sms_rules | integrations | general
+  key         String
+  value       String   // JSON-encoded value
+  label       String?
+  updatedBy   String?
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([category, key])
 }
 
 // ---------------------------------------------------------------------------

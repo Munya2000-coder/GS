@@ -60,7 +60,14 @@ export type Permission =
   | "audittrail.export"
   | "governance.manage"
   | "config.manage"
-  | "inspection.run";
+  | "inspection.run"
+  | "payroll.view"
+  | "payroll.manage"
+  | "recruitment.view"
+  | "recruitment.manage"
+  | "capa.manage"
+  | "reports.view"
+  | "reports.export";
 
 const ALL: Permission[] = [
   "dashboard.view", "worker.view", "worker.edit", "cos.view", "cos.submit",
@@ -68,6 +75,8 @@ const ALL: Permission[] = [
   "rtw.view", "rtw.edit", "document.view", "document.upload", "document.approve",
   "document.delete", "sms.view", "sms.manage", "sms.close", "audittrail.view",
   "audittrail.export", "governance.manage", "config.manage", "inspection.run",
+  "payroll.view", "payroll.manage", "recruitment.view", "recruitment.manage",
+  "capa.manage", "reports.view", "reports.export",
 ];
 
 // Role → granted permissions. Kept explicit for auditability.
@@ -77,28 +86,31 @@ const ROLE_PERMISSIONS: Record<RoleKey, Permission[]> = {
     "dashboard.view", "worker.view", "cos.view", "cos.approve.ao", "rtw.view",
     "document.view", "document.approve", "sms.view", "sms.close", "audittrail.view",
     "audittrail.export", "governance.manage", "inspection.run",
+    "payroll.view", "recruitment.view", "capa.manage", "reports.view", "reports.export",
   ],
   KEY_CONTACT: [
     "dashboard.view", "worker.view", "worker.edit", "cos.view", "cos.submit",
     "rtw.view", "rtw.edit", "document.view", "document.upload", "sms.view",
-    "sms.manage", "audittrail.view",
+    "sms.manage", "audittrail.view", "recruitment.view", "reports.view",
   ],
   LEVEL_1_SMS: ["dashboard.view", "worker.view", "cos.view", "cos.submit", "sms.view", "sms.manage", "rtw.view", "document.view"],
   LEVEL_2_SMS: ["dashboard.view", "worker.view", "cos.view", "sms.view", "document.view"],
   HR_MANAGER: [
     "dashboard.view", "worker.view", "worker.edit", "cos.view", "cos.approve.hr",
     "rtw.view", "rtw.edit", "document.view", "document.upload", "document.approve", "sms.view",
+    "recruitment.view", "recruitment.manage", "reports.view",
   ],
-  HR_OFFICER: ["dashboard.view", "worker.view", "worker.edit", "rtw.view", "rtw.edit", "document.view", "document.upload"],
+  HR_OFFICER: ["dashboard.view", "worker.view", "worker.edit", "rtw.view", "rtw.edit", "document.view", "document.upload", "recruitment.view"],
   COMPLIANCE_MANAGER: [
     "dashboard.view", "worker.view", "worker.edit", "cos.view", "cos.approve.compliance",
     "rtw.view", "document.view", "document.approve", "document.delete", "sms.view",
     "sms.manage", "sms.close", "audittrail.view", "audittrail.export", "inspection.run",
+    "payroll.view", "recruitment.view", "recruitment.manage", "capa.manage", "reports.view", "reports.export",
   ],
-  FINANCE_MANAGER: ["dashboard.view", "worker.view", "cos.view", "cos.approve.finance", "document.view"],
-  CARE_OPS_MANAGER: ["dashboard.view", "worker.view", "cos.view", "document.view"],
-  LINE_MANAGER: ["dashboard.view", "worker.view", "cos.view", "document.view"],
-  AUDITOR: ["dashboard.view", "worker.view", "cos.view", "rtw.view", "document.view", "sms.view", "audittrail.view"],
+  FINANCE_MANAGER: ["dashboard.view", "worker.view", "cos.view", "cos.approve.finance", "document.view", "payroll.view", "payroll.manage", "reports.view", "reports.export"],
+  CARE_OPS_MANAGER: ["dashboard.view", "worker.view", "cos.view", "document.view", "payroll.view", "recruitment.view", "reports.view"],
+  LINE_MANAGER: ["dashboard.view", "worker.view", "cos.view", "document.view", "payroll.view"],
+  AUDITOR: ["dashboard.view", "worker.view", "cos.view", "rtw.view", "document.view", "sms.view", "audittrail.view", "payroll.view", "recruitment.view", "reports.view"],
   LEGAL_ADVISER: ["worker.view", "cos.view", "document.view"],
   INSPECTOR: ["dashboard.view", "worker.view", "cos.view", "rtw.view", "document.view", "sms.view"],
   WORKER_SELF_SERVICE: [],

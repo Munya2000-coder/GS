@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea, Label } from "@/components/ui/field";
 import { PageIntro } from "@/components/page-header";
+import { SalaryComplianceCard } from "@/components/salary-compliance-card";
 import { actionCosStage } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -134,6 +135,7 @@ export default async function CosDetailPage({ params }: { params: { id: string }
               <Row label="SMS reference" value={cos.smsReference ?? "—"} mono />
             </CardContent>
           </Card>
+          <SalaryComplianceCard socCode={cos.socCode} salary={cos.salary} contractedHours={cos.contractedHours} />
           <Card>
             <CardHeader><CardTitle>Genuine vacancy (Module 3)</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">

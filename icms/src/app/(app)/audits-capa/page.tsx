@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { fmtDate } from "@/lib/dates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/field";
 import { PageIntro } from "@/components/page-header";
+import { closeCapa, closeFinding } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +16,12 @@ const catVariant = (c: string): "critical" | "red" | "amber" | "green" =>
 
 // Internal audit findings + CAPA management (PRD Modules 16 & 17).
 export default async function AuditsCapaPage() {
-  const [findings, capas] = await Promise.all([
+  const [findings, capas, user] = await Promise.all([
     prisma.auditFinding.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.capa.findMany({ orderBy: { createdAt: "desc" } }),
+    getCurrentUser(),
   ]);
+  const canManage = !!user?.permissions.has("capa.manage");
 
   return (
     <div className="space-y-5">
@@ -33,6 +39,7 @@ export default async function AuditsCapaPage() {
                 <TableHead>Owner</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
+                {canManage && <TableHead>Close</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -44,6 +51,19 @@ export default async function AuditsCapaPage() {
                   <TableCell>{f.owner ?? "—"}</TableCell>
                   <TableCell>{fmtDate(f.dueDate)}</TableCell>
                   <TableCell><Badge variant={f.status === "Closed" ? "green" : "amber"}>{f.status}</Badge></TableCell>
+                  {canManage && (
+                    <TableCell>
+                      {f.status === "Closed" ? (
+                        "—"
+                      ) : (
+                        <form action={closeFinding} className="flex items-center gap-2">
+                          <input type="hidden" name="findingId" value={f.id} />
+                          <Input name="closureEvidence" placeholder="Evidence ref" className="h-8 w-32" />
+                          <Button type="submit" size="sm">Close</Button>
+                        </form>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -63,6 +83,7 @@ export default async function AuditsCapaPage() {
                 <TableHead>Owner</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
+                {canManage && <TableHead>Close</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -74,6 +95,19 @@ export default async function AuditsCapaPage() {
                   <TableCell>{c.owner ?? "—"}</TableCell>
                   <TableCell>{fmtDate(c.dueDate)}</TableCell>
                   <TableCell><Badge variant={c.status === "Closed" ? "green" : "amber"}>{c.status}</Badge></TableCell>
+                  {canManage && (
+                    <TableCell>
+                      {c.status === "Closed" ? (
+                        "—"
+                      ) : (
+                        <form action={closeCapa} className="flex items-center gap-2">
+                          <input type="hidden" name="capaId" value={c.id} />
+                          <Input name="evidence" placeholder="Evidence ref" className="h-8 w-32" />
+                          <Button type="submit" size="sm">Close</Button>
+                        </form>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

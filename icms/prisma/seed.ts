@@ -362,6 +362,78 @@ async function main() {
     },
   });
 
+  // --- System configuration defaults (§17) ---
+  const configDefaults = [
+    { category: "salary_thresholds", key: "immigration_floor_annual", value: 23200, label: "Immigration salary floor (£/yr)" },
+    { category: "salary_thresholds", key: "nmw_hourly", value: 11.44, label: "National Minimum Wage (£/hr)" },
+    { category: "salary_thresholds", key: "wtr_max_weekly_hours", value: 48, label: "WTR max weekly hours" },
+    { category: "salary_thresholds", key: "going_rate_by_soc", value: { "6135": { annual: 23200, hourly: 11.9 }, "6136": { annual: 24400, hourly: 12.5 } }, label: "Going rate by SOC" },
+    { category: "alert_periods", key: "thresholds_days", value: "180,90,60,30,14,7", label: "Alert thresholds (days)" },
+    { category: "score_weights", key: "right_to_work", value: 20 },
+    { category: "score_weights", key: "visa", value: 20 },
+    { category: "score_weights", key: "appendix_d", value: 20 },
+    { category: "score_weights", key: "cos", value: 15 },
+    { category: "score_weights", key: "payroll", value: 10 },
+    { category: "score_weights", key: "sms", value: 10 },
+  ];
+  for (const c of configDefaults) {
+    await prisma.configuration.create({
+      data: { category: c.category, key: c.key, value: JSON.stringify(c.value), label: c.label, approvedBy: "Margaret Okafor", approvedAt: subDays(now, 30) },
+    });
+  }
+
+  // --- Recruitment records, rota shifts, payroll reconciliation per worker ---
+  const seededWorkers = await prisma.worker.findMany({ include: { cosRecords: true } });
+  const recItemKeys = ["advert", "job_description", "person_spec", "application_form", "cv", "interview_notes", "scoring_matrix", "selection_justification", "references", "qualifications", "professional_registration", "dbs"];
+  for (const w of seededWorkers) {
+    // Recruitment evidence — completeness mirrors the worker's overall posture.
+    const ratio = w.ragStatus === "Green" ? 1 : w.ragStatus === "Amber" ? 0.85 : 0.55;
+    const items: Record<string, string> = {};
+    recItemKeys.forEach((k, i) => { items[k] = i / recItemKeys.length < ratio ? "Approved" : i % 2 === 0 ? "Uploaded" : "Missing"; });
+    await prisma.recruitmentRecord.create({
+      data: {
+        workerId: w.id,
+        cosId: w.cosRecords[0]?.id,
+        items: JSON.stringify(items),
+        selectionJustification: "Highest scoring candidate against the person specification; references satisfactory.",
+        complete: ratio === 1,
+      },
+    });
+
+    // Rota shifts for the trailing 2 weeks (CareLineLive-style).
+    for (let d = 1; d <= 10; d++) {
+      const planned = 7.5;
+      const isAbsence = w.ragStatus === "Critical" && d % 4 === 0;
+      await prisma.rotaShift.create({
+        data: {
+          workerId: w.id,
+          shiftDate: subDays(now, d),
+          plannedHours: planned,
+          actualHours: isAbsence ? 0 : planned,
+          clientRef: pkg.serviceCode,
+          status: isAbsence ? "No Show" : "Completed",
+        },
+      });
+    }
+
+    // Backfill expectedGross on the existing payroll record.
+    const expected = Math.round(((w.salary ?? 0) / 12) * 100) / 100;
+    await prisma.payrollRecord.updateMany({ where: { workerId: w.id }, data: { expectedGross: expected } });
+  }
+
+  // A completed reconciliation run for the prior month.
+  const exceptionCount = await prisma.payrollRecord.count({ where: { exception: { not: null } } });
+  await prisma.payrollReconciliation.create({
+    data: {
+      period: "2026-05",
+      runBy: "James Adeyemi",
+      totalRecords: seededWorkers.length,
+      exceptionsCount: exceptionCount,
+      status: "Completed",
+      summary: JSON.stringify({ underpayments: exceptionCount, clean: seededWorkers.length - exceptionCount }),
+    },
+  });
+
   // --- Recompute compliance scores for all workers ---
   const allWorkers = await prisma.worker.findMany({
     include: { visas: true, rtwChecks: true, cosRecords: true, appendixD: true, reportableEvents: true, payrollRecords: true },

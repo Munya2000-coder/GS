@@ -73,11 +73,9 @@ is no local password system.)
 
 ---
 
-## What's implemented (vertical-slice MVP)
+## What's implemented
 
-This first build delivers the **core compliance spine** end-to-end, with the
-remaining modules scaffolded (data model + navigation + planned-requirement
-pages). Implemented modules:
+All navigation modules are now functional end-to-end. Core compliance spine:
 
 - **Dashboard** (Module 15) — licence status, RAG worker counts, metric tiles,
   high-risk workers, upcoming SMS deadlines.
@@ -101,11 +99,29 @@ pages). Implemented modules:
   gate** (ICMS-055).
 - **Audit Trail** (Module 20) — append-only, non-editable action log with a
   page-level RBAC guard.
-- **Governance / Risk Register / Audits & CAPA** — read-only views over real
-  seeded data.
+- **Governance / Risk Register** — sponsor licence, SMS users, risk views.
 
-Scaffolded (planned-requirement placeholder pages): Recruitment, Payroll & Rota,
-Inspection Mode, Reports, Settings.
+Extended modules (second build phase):
+
+- **Salary & hours compliance** (Module 8) — going-rate / immigration-floor / NMW /
+  WTR checks shown on each CoS; Finance-stage approval is **blocked below a
+  mandatory floor** (ICMS-035), with thresholds read from configurable Settings.
+- **Payroll & Rota** (Modules 9 & 10) — **BrightPay CSV import** with all-or-nothing
+  validation and automatic underpayment flagging; reconciliation runs; exception
+  list with investigation-gated resolution (ICMS-042) and AO escalation; CareLineLive
+  rota utilisation (planned vs actual hours, no-shows).
+- **Recruitment** (Modules 3 & 4) — per-worker recruitment evidence completeness
+  and documented-exception approval (ICMS-021).
+- **Audits & CAPA** (Modules 16 & 17) — interactive **evidence-gated closure** of
+  findings and CAPAs, restricted to the Compliance Manager (ICMS-074/076).
+- **Inspection Mode** (Module 18) — UKVI inspection dashboard, **time-limited 72-hour
+  inspector accounts** (create/revoke), and a real **structured ZIP export** of the
+  evidence pack (licence, worker register, CoS register, per-worker Appendix D).
+- **Reports** (Module 31) — report library with **CSV export** and **printable
+  (ELMS-letterhead) PDF views**, each carrying generation metadata; RBAC-scoped.
+- **Settings** (§17) — editable system configuration (salary thresholds, alert
+  schedule, compliance-score weighting) that drives runtime behaviour; every change
+  is audit-trailed.
 
 ### RBAC
 
@@ -157,8 +173,13 @@ icms/
 
 ## Scope note
 
-This is a reference build of the compliance spine, not the complete 31-module
-system. Where a requirement needs Azure/third-party connectivity
-(CareLineLive, BrightPay, Graph, Entra) the boundary is stubbed and labelled
-rather than mocked silently. Enforced compliance invariants are implemented for
-real against the database.
+Every navigation module is functional. Where a requirement needs live
+Azure/third-party connectivity (Entra ID SSO, Azure Blob, Microsoft Graph,
+CareLineLive's REST/webhook feed) the boundary is stubbed and clearly labelled
+rather than mocked silently — but the logic on top of it is real: the BrightPay
+importer parses and reconciles actual CSV, the inspection pack is a genuine ZIP,
+reports export real data, and all enforced compliance invariants (gated CoS
+approval, evidence gates, salary floors, audit immutability, RBAC) run for real
+against the database. Remaining depth for a full production system includes the
+advanced sub-features of some modules (e.g. AI-assisted review, policy
+attestation, worker self-service portal, CQC evidence mapping).
