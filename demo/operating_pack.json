@@ -1,0 +1,758 @@
+{
+  "fund_id": "GSRE_FUND_I",
+  "fund_name": "GrowthSense Real Estate Fund I, L.P.",
+  "documents": [
+    {
+      "id": 1,
+      "name": "GSRE LPA",
+      "type": "lpa",
+      "authority": 1
+    },
+    {
+      "id": 2,
+      "name": "GSRE PPM",
+      "type": "ppm",
+      "authority": 4
+    },
+    {
+      "id": 3,
+      "name": "LP07 Side Letter",
+      "type": "side_letter",
+      "authority": 2
+    },
+    {
+      "id": 4,
+      "name": "LP12 Side Letter",
+      "type": "side_letter",
+      "authority": 2
+    },
+    {
+      "id": 5,
+      "name": "LP14 Side Letter",
+      "type": "side_letter",
+      "authority": 2
+    }
+  ],
+  "fund_terms_summary": [
+    {
+      "field": "Fund Name",
+      "value": "GrowthSense Real Estate Fund I",
+      "source_reference": "Section 1.1",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": false
+    },
+    {
+      "field": "Currency",
+      "value": "USD",
+      "source_reference": "Section 1.1",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": false
+    },
+    {
+      "field": "Term (years)",
+      "value": 10,
+      "source_reference": "Section 1.1",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": false
+    },
+    {
+      "field": "Management Fee",
+      "value": "2.0%",
+      "source_reference": "Section 5.1",
+      "page": 1,
+      "confidence": 0.7,
+      "status": "amber_review",
+      "review": true
+    },
+    {
+      "field": "Fee Basis",
+      "value": "Committed Capital",
+      "source_reference": "Section 5.1",
+      "page": 1,
+      "confidence": 0.7,
+      "status": "amber_review",
+      "review": true
+    },
+    {
+      "field": "Fee Timing",
+      "value": "quarterly in advance",
+      "source_reference": "Section 5.1",
+      "page": 1,
+      "confidence": 0.7,
+      "status": "amber_review",
+      "review": true
+    },
+    {
+      "field": "Strategy",
+      "value": "United States real estate",
+      "source_reference": "Section 3.1",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": false
+    },
+    {
+      "field": "Bank",
+      "value": "AXZ Bankers",
+      "source_reference": "Section 8.1",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": false
+    },
+    {
+      "field": "Preferred Return",
+      "value": "8%",
+      "source_reference": "Section 4.2",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": true
+    },
+    {
+      "field": "Carried Interest",
+      "value": "20%",
+      "source_reference": "Section 4.3",
+      "page": 1,
+      "confidence": 0.95,
+      "status": "green_confirmed",
+      "review": true
+    }
+  ],
+  "operating_rules": [
+    {
+      "rule_id": "RULE_0001",
+      "rule_type": "fund_identity",
+      "source_document_id": 1,
+      "source_reference": "Section 1.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Fund GrowthSense Real Estate Fund I (USD), term 10 years.",
+      "structured_rule": {
+        "rule_type": "fund_identity",
+        "fund_name": "GrowthSense Real Estate Fund I",
+        "currency": "USD",
+        "term_years": 10
+      },
+      "evidence_required": [],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 1.1",
+        "page_number": 1,
+        "exact_extracted_text": "Name and Currency The name of the Fund is GrowthSense Real Estate Fund I, L.P."
+      }
+    },
+    {
+      "rule_id": "RULE_0002",
+      "rule_type": "investment_mandate",
+      "source_document_id": 1,
+      "source_reference": "Section 3.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Mandate: real_estate in United States.",
+      "structured_rule": {
+        "rule_type": "investment_mandate",
+        "asset_class": "real_estate",
+        "geography": "United States",
+        "non_us_investments_permitted": false
+      },
+      "evidence_required": [],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 3.1",
+        "page_number": 1,
+        "exact_extracted_text": "Investment Mandate The Fund shall invest primarily in United States real estate only."
+      }
+    },
+    {
+      "rule_id": "RULE_0003",
+      "rule_type": "preferred_return",
+      "source_document_id": 1,
+      "source_reference": "Section 4.2",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Preferred return of 8% (Compounded Annually).",
+      "structured_rule": {
+        "rule_type": "preferred_return",
+        "rate": "8%",
+        "calculation_method": "compound",
+        "calculation_basis": "Compounded Annually",
+        "compounding_frequency": "annual",
+        "base": "unreturned_contributed_capital",
+        "day_count_convention": null
+      },
+      "evidence_required": [],
+      "confidence_score": 0.95,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 4.2",
+        "page_number": 1,
+        "exact_extracted_text": "Preferred Return The Limited Partners shall receive an 8% preferred return, compounded annually, on unreturned contributed capital."
+      }
+    },
+    {
+      "rule_id": "RULE_0004",
+      "rule_type": "carried_interest",
+      "source_document_id": 1,
+      "source_reference": "Section 4.3",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Carried interest of 20% to the GP, catch-up=True.",
+      "structured_rule": {
+        "rule_type": "carried_interest",
+        "carry_percentage": "20%",
+        "recipient": "general_partner",
+        "catch_up": true,
+        "gp_catch_up_split": "80/20",
+        "clawback_required": false
+      },
+      "evidence_required": [
+        "carry calculation",
+        "approval evidence"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 4.3",
+        "page_number": 1,
+        "exact_extracted_text": "Carried Interest The General Partner is entitled to carried interest of 20%, subject to a 100% GP catch-up and an 80/20 split thereafter."
+      }
+    },
+    {
+      "rule_id": "RULE_0005",
+      "rule_type": "management_fee",
+      "source_document_id": 1,
+      "source_reference": "Section 5.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Management fee of 2.0% on committed capital, charged quarterly in advance.",
+      "structured_rule": {
+        "rule_type": "management_fee",
+        "fee_rate": "2.0%",
+        "fee_base": "committed_capital",
+        "fee_basis_investment_period": "committed_capital",
+        "frequency": "quarterly_in_advance",
+        "offsets": []
+      },
+      "evidence_required": [
+        "management fee calculation",
+        "approval evidence",
+        "journal entry support",
+        "investor allocation schedule"
+      ],
+      "confidence_score": 0.7,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 5.1",
+        "page_number": 1,
+        "exact_extracted_text": "Management Fee The Management Fee shall be 2.0% per annum of committed capital, payable quarterly in advance, unless otherwise determined by the General Partner in its sole discretion."
+      }
+    },
+    {
+      "rule_id": "RULE_0006",
+      "rule_type": "fund_expense",
+      "source_document_id": 1,
+      "source_reference": "Section 6.3",
+      "rule_status": "pending_review",
+      "plain_english_summary": "organizational expenses allocated pro rata by commitment.",
+      "structured_rule": {
+        "rule_type": "expense_allocation",
+        "expense_type": "organizational_expenses",
+        "cap_amount": 1000000,
+        "allocation_basis": "pro_rata_by_commitment",
+        "excess_paid_by": "manager"
+      },
+      "evidence_required": [
+        "accrual support",
+        "vendor invoice",
+        "approval evidence"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 6.3",
+        "page_number": 1,
+        "exact_extracted_text": "Fund Expenses Organizational expenses of the Partnership are capped at 1,000,000;"
+      }
+    },
+    {
+      "rule_id": "RULE_0007",
+      "rule_type": "treasury",
+      "source_document_id": 1,
+      "source_reference": "Section 8.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Banking relationship: AXZ Bankers.",
+      "structured_rule": {
+        "rule_type": "treasury",
+        "bank": "AXZ Bankers",
+        "wire_instructions_present": true,
+        "signatory_matrix_present": false
+      },
+      "evidence_required": [
+        "bank setup packet",
+        "signatory matrix",
+        "wire approval"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 8.1",
+        "page_number": 1,
+        "exact_extracted_text": "Treasury The banking relationship is with AXZ Bankers."
+      }
+    },
+    {
+      "rule_id": "RULE_0008",
+      "rule_type": "reporting",
+      "source_document_id": 1,
+      "source_reference": "Section 12.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Audited Financial Statements delivered annual to all_limited_partners.",
+      "structured_rule": {
+        "rule_type": "reporting_obligation",
+        "report_name": "Audited Financial Statements",
+        "frequency": "annual",
+        "deadline_days_after_period_end": 120,
+        "due_date_rule": "120_days_after_period_end",
+        "recipient": "all_limited_partners",
+        "responsible_party": "fund_admin",
+        "investor_specific": false
+      },
+      "evidence_required": [
+        "report package",
+        "approval record",
+        "portal delivery confirmation"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 12.1",
+        "page_number": 1,
+        "exact_extracted_text": "Reporting The Partnership shall deliver audited financial statements annually within 120 days after fiscal year end to the Limited Partners."
+      }
+    },
+    {
+      "rule_id": "RULE_0009",
+      "rule_type": "profit_loss_allocation",
+      "source_document_id": 1,
+      "source_reference": "Section 12.2",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Profit Loss Allocation clause.",
+      "structured_rule": {
+        "rule_type": "profit_loss_allocation",
+        "profits_basis": "in_accordance_with_distribution_waterfall",
+        "losses_basis": "pro_rata_by_capital_accounts",
+        "special_allocations": []
+      },
+      "evidence_required": [],
+      "confidence_score": 0.725,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 12.2",
+        "page_number": 1,
+        "exact_extracted_text": "Capital Account Reporting Capital account statements shall be delivered quarterly within 45 days after quarter end."
+      }
+    },
+    {
+      "rule_id": "RULE_0010",
+      "rule_type": "tax_reporting",
+      "source_document_id": 1,
+      "source_reference": "Section 14.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Tax reporting: schedule_k1, ubti.",
+      "structured_rule": {
+        "rule_type": "tax_reporting",
+        "reports": [
+          "schedule_k1",
+          "ubti"
+        ],
+        "frequency": "annual"
+      },
+      "evidence_required": [
+        "k-1 package",
+        "tax workpapers",
+        "approval record"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 1,
+        "source_reference": "Section 14.1",
+        "page_number": 1,
+        "exact_extracted_text": "Tax Reporting Each Limited Partner shall receive a Schedule K-1 annually, with UBTI reporting."
+      }
+    },
+    {
+      "rule_id": "RULE_0011",
+      "rule_type": "investment_mandate",
+      "source_document_id": 2,
+      "source_reference": "Section 2.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Mandate: real_estate in North America.",
+      "structured_rule": {
+        "rule_type": "investment_mandate",
+        "asset_class": "real_estate",
+        "geography": "North America",
+        "non_us_investments_permitted": null
+      },
+      "evidence_required": [],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 2,
+        "source_reference": "Section 2.1",
+        "page_number": 1,
+        "exact_extracted_text": "Investment Strategy The Fund invests primarily in North America real estate."
+      }
+    },
+    {
+      "rule_id": "RULE_0012",
+      "rule_type": "management_fee",
+      "source_document_id": 2,
+      "source_reference": "Section 4.1",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Management fee of 1.5% on committed capital, charged periodically.",
+      "structured_rule": {
+        "rule_type": "management_fee",
+        "fee_rate": "1.5%",
+        "fee_base": "committed_capital",
+        "fee_basis_investment_period": "committed_capital",
+        "frequency": null,
+        "offsets": []
+      },
+      "evidence_required": [
+        "management fee calculation",
+        "approval evidence",
+        "journal entry support",
+        "investor allocation schedule"
+      ],
+      "confidence_score": 0.8,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 2,
+        "source_reference": "Section 4.1",
+        "page_number": 1,
+        "exact_extracted_text": "Management Fee The management fee disclosed to investors is 1.5% of committed capital."
+      }
+    },
+    {
+      "rule_id": "RULE_0013",
+      "rule_type": "side_letter",
+      "source_document_id": 3,
+      "source_reference": "Section 4",
+      "rule_status": "pending_review",
+      "plain_english_summary": null,
+      "structured_rule": {
+        "rule_type": "side_letter_override",
+        "override_type": "management_fee_discount",
+        "overridden_clause_type": "management_fee",
+        "override_value": null
+      },
+      "evidence_required": [],
+      "confidence_score": 0.725,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 3,
+        "source_reference": "Section 4",
+        "page_number": 1,
+        "exact_extracted_text": "The Investor shall receive quarterly management fee and expense detail."
+      }
+    },
+    {
+      "rule_id": "RULE_0014",
+      "rule_type": "side_letter",
+      "source_document_id": 4,
+      "source_reference": "Section 3",
+      "rule_status": "pending_review",
+      "plain_english_summary": null,
+      "structured_rule": {
+        "rule_type": "side_letter_override",
+        "override_type": "esg_election",
+        "overridden_clause_type": "esg",
+        "override_value": null
+      },
+      "evidence_required": [],
+      "confidence_score": 0.725,
+      "requires_human_review": true,
+      "citation": {
+        "source_document_id": 4,
+        "source_reference": "Section 3",
+        "page_number": 1,
+        "exact_extracted_text": "The Investor requires ESG reporting and exclusion of tobacco."
+      }
+    },
+    {
+      "rule_id": "RULE_0015",
+      "rule_type": "tax_reporting",
+      "source_document_id": 5,
+      "source_reference": "Section 2",
+      "rule_status": "pending_review",
+      "plain_english_summary": "Tax reporting: schedule_k1, k1_estimate.",
+      "structured_rule": {
+        "rule_type": "tax_reporting",
+        "reports": [
+          "schedule_k1",
+          "k1_estimate"
+        ],
+        "frequency": "annual"
+      },
+      "evidence_required": [
+        "k-1 package",
+        "tax workpapers",
+        "approval record"
+      ],
+      "confidence_score": 0.95,
+      "requires_human_review": false,
+      "citation": {
+        "source_document_id": 5,
+        "source_reference": "Section 2",
+        "page_number": 1,
+        "exact_extracted_text": "The Investor requires an early K-1 estimate for tax planning."
+      }
+    }
+  ],
+  "investor_obligation_matrix": [
+    {
+      "investor": "LP01",
+      "commitment": "80000000.00",
+      "side_letter": false,
+      "custom_reporting": "Standard",
+      "restriction": "None",
+      "tax_requirement": "Standard K-1",
+      "notice_variant": "Standard",
+      "mfn": false,
+      "review_needed": false
+    },
+    {
+      "investor": "LP07",
+      "commitment": "80000000.00",
+      "side_letter": true,
+      "custom_reporting": "Fee detail",
+      "restriction": "None",
+      "tax_requirement": "Standard K-1",
+      "notice_variant": "Standard",
+      "mfn": false,
+      "review_needed": true
+    },
+    {
+      "investor": "LP12",
+      "commitment": "80000000.00",
+      "side_letter": true,
+      "custom_reporting": "Standard",
+      "restriction": "ESG exclusion",
+      "tax_requirement": "Standard K-1",
+      "notice_variant": "Standard",
+      "mfn": false,
+      "review_needed": true
+    },
+    {
+      "investor": "LP14",
+      "commitment": "80000000.00",
+      "side_letter": false,
+      "custom_reporting": "Standard",
+      "restriction": "None",
+      "tax_requirement": "Standard K-1",
+      "notice_variant": "Standard",
+      "mfn": false,
+      "review_needed": false
+    }
+  ],
+  "reporting_obligation_matrix": [
+    {
+      "report": "Audited Financial Statements",
+      "frequency": "annual",
+      "due_date": "120_days_after_period_end",
+      "recipient": "all_limited_partners",
+      "source": "Section 12.1",
+      "owner": "fund_admin",
+      "evidence": [
+        "report package",
+        "approval record",
+        "portal delivery confirmation"
+      ],
+      "investor_specific": false
+    },
+    {
+      "report": "Tax Reporting",
+      "frequency": "annual",
+      "due_date": null,
+      "recipient": "all_limited_partners",
+      "source": "Section 14.1",
+      "owner": "fund_admin",
+      "evidence": [
+        "k-1 package",
+        "tax workpapers",
+        "approval record"
+      ],
+      "investor_specific": false
+    },
+    {
+      "report": "Tax Reporting",
+      "frequency": "annual",
+      "due_date": null,
+      "recipient": "all_limited_partners",
+      "source": "Section 2",
+      "owner": "fund_admin",
+      "evidence": [
+        "k-1 package",
+        "tax workpapers",
+        "approval record"
+      ],
+      "investor_specific": false
+    },
+    {
+      "report": "Management Fee & Expense Detail",
+      "frequency": "quarterly",
+      "due_date": "with_quarterly_package",
+      "recipient": "LP07",
+      "source": "Side Letter Section 4",
+      "owner": "fund_admin",
+      "evidence": [
+        "report package",
+        "approval record"
+      ],
+      "investor_specific": true
+    },
+    {
+      "report": "ESG Report",
+      "frequency": "quarterly",
+      "due_date": "with_quarterly_package",
+      "recipient": "LP12",
+      "source": "Side Letter Section 3",
+      "owner": "fund_admin",
+      "evidence": [
+        "report package",
+        "approval record"
+      ],
+      "investor_specific": true
+    }
+  ],
+  "obligation_calendar": [
+    {
+      "timing": "quarterly in advance",
+      "obligation": "Calculate management fees",
+      "source": "Section 5.1",
+      "required_action": "Prepare and approve fee calculation"
+    },
+    {
+      "timing": "Quarterly",
+      "obligation": "Accrue fund expenses (audit/tax)",
+      "source": "Section 6.3",
+      "required_action": "Book quarterly accrual"
+    },
+    {
+      "timing": "Annually",
+      "obligation": "Pay audit & tax fees",
+      "source": "Section 6.3",
+      "required_action": "Process payment"
+    },
+    {
+      "timing": "Annual",
+      "obligation": "Deliver Audited Financial Statements",
+      "source": "Section 12.1",
+      "required_action": "Generate, approve, and distribute"
+    },
+    {
+      "timing": "Annual",
+      "obligation": "Deliver Tax reporting",
+      "source": "Section 14.1",
+      "required_action": "Generate, approve, and distribute"
+    },
+    {
+      "timing": "Annual",
+      "obligation": "Deliver Tax reporting",
+      "source": "Section 2",
+      "required_action": "Generate, approve, and distribute"
+    }
+  ],
+  "exception_report": [
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "capital_call",
+      "explanation": "No capital_call provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "investment_period",
+      "explanation": "No investment_period provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "distribution_waterfall",
+      "explanation": "No distribution_waterfall provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "clawback",
+      "explanation": "No clawback provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "transfer",
+      "explanation": "No transfer provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "valuation",
+      "explanation": "No valuation provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "missing_operating_rule",
+      "severity": "high",
+      "subject": "fund_termination",
+      "explanation": "No fund_termination provision found. Human review required.",
+      "action": "Human review"
+    },
+    {
+      "kind": "ppm_lpa_fee_mismatch",
+      "severity": "high",
+      "subject": null,
+      "explanation": "LPA management fee: 2.0% vs PPM management fee: 1.5%",
+      "action": "LPA governs; confirm PPM disclosure or amend. Human review required."
+    },
+    {
+      "kind": "ppm_lpa_mandate_mismatch",
+      "severity": "high",
+      "subject": null,
+      "explanation": "LPA investment geography: United States vs PPM investment geography: North America",
+      "action": "LPA governs; confirm PPM disclosure or amend. Human review required."
+    },
+    {
+      "kind": "side_letter_override",
+      "severity": "medium",
+      "subject": null,
+      "explanation": "[Section 5.1] rule_type=management_fee, fee_rate=2.0%, fee_base=committed_capital, fee_basis_investment_period=committed_capital vs [Section 4] rule_type=side_letter_override, override_type=management_fee_discount, overridden_clause_type=management_fee, exact_extracted_text=The Investor shall receive quarterly management fee and expense detail.",
+      "action": "Apply override only to investor 2."
+    }
+  ],
+  "summary": {
+    "documents": 5,
+    "rules": 15,
+    "open_exceptions": 10,
+    "high_severity_exceptions": 9
+  }
+}

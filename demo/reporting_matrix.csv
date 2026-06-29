@@ -1,0 +1,6 @@
+Report,Frequency,Due Date,Recipient,Source,Owner,InvestorSpecific
+Audited Financial Statements,annual,120_days_after_period_end,all_limited_partners,Section 12.1,fund_admin,False
+Tax Reporting,annual,,all_limited_partners,Section 14.1,fund_admin,False
+Tax Reporting,annual,,all_limited_partners,Section 2,fund_admin,False
+Management Fee & Expense Detail,quarterly,with_quarterly_package,LP07,Side Letter Section 4,fund_admin,True
+ESG Report,quarterly,with_quarterly_package,LP12,Side Letter Section 3,fund_admin,True

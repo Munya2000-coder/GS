@@ -4,7 +4,7 @@ End-to-end private capital operations platform: fund accounting, partnership
 accounting, investor administration, fee management, carry/waterfall
 administration, reporting, reconciliations, audit trails, and integrations.
 
-Covers all 12 epics of the master user story package with a real REST API,
+Covers all 13 epics of the master user story package with a real REST API,
 server-rendered HTML UI, background-job tracking, CSV exports, performance
 analytics, capital-call & distribution workflows, NAV management, period and
 close-calendar controls, and a CLI for administration.
@@ -94,19 +94,19 @@ docker compose up --build
 - Python 3.11+ · FastAPI · SQLAlchemy 2.x · Pydantic v2
 - Jinja2 server-rendered UI
 - SQLite (dev) / Postgres (prod) — swap via `DATABASE_URL`
-- pytest (28 tests)
+- pytest (50 tests)
 
 ## Layout
 
 ```
 app/
   core/           config, database, security/RBAC
-  models/         domain model (20 tables)
+  models/         domain model (24 tables)
   schemas/        Pydantic contracts
   services/       accounting, fees, waterfall, capital calls, distributions,
                   NAV, close, performance (IRR/TVPI/DPI), dashboards,
                   reconciliation, exports, jobs, migration, seed
-  api/            REST routers (18, one per epic/sub-domain)
+  api/            REST routers (19, one per epic/sub-domain)
   ui/             Jinja2 HTML (legacy, kept for /ui/)
   spa.py          mounts the compiled React SPA from app/static/
   cli.py          gsctl command-line tool
@@ -117,7 +117,7 @@ frontend/         React + TypeScript + Vite SPA
   src/pages/      Login, Dashboard, Funds, FundDetail, Investors,
                   Transactions, CapitalCalls, Distributions, Periods,
                   Operations, Audit
-tests/            pytest suite (29 tests)
+tests/            pytest suite (50 tests)
 scripts/          bootstrap + ops helpers
 Dockerfile, docker-compose.yml
 ```
@@ -140,6 +140,8 @@ Dockerfile, docker-compose.yml
 | Performance | IRR, TVPI, DPI, RVPI, MOIC, PIC |
 | Dashboards | platform, fund, operations |
 | Exports | transactions.csv, trial-balance.csv, capital-accounts.csv, journal-entries.csv |
+| LPA Intelligence | `/lpa/documents` upload+extract, `/lpa/documents/{id}/blueprint` (Fund Logic Blueprint), `/lpa/rules` review/approve/reject, `/lpa/issues`, `/lpa/conflicts`, `/lpa/validate/{management-fee,capital-call,waterfall}` |
+| Fund Operating Pack | `/lpa/funds/{id}/operating-pack` (+ `.json`), `/lpa/funds/{id}/{fund-terms,reporting-matrix,investor-matrix,calendar,exceptions}`, `/lpa/funds/{id}/consistency-check`, CSV exports |
 | Audit | events, lineage upstream/downstream |
 | Admin | users provisioning, deactivate |
 | Reconciliation | batch recon, exception assignment |
@@ -162,6 +164,87 @@ Dockerfile, docker-compose.yml
 | 10 | Security & User Administration | `core/security.py`, `models/user.py`, `api/admin.py` |
 | 11 | Reconciliation & Controls | `services/reconciliation.py`, import exception queue |
 | 12 | Migration, Testing, Go-Live | `services/migration.py`, `services/seed.py`, test suite |
+| 13 | LPA Document Intelligence & Rule Extraction | `models/lpa.py`, `services/lpa_parser.py`, `services/lpa_extraction.py`, `services/lpa_validation.py`, `api/lpa.py` |
+
+### Epic 13 — LPA as the source of truth
+
+The LPA (and its side letters / amendments) is converted into a structured,
+source-traceable, human-approved operating rule set that downstream validators
+execute against. This is **not** a generic PDF chatbot — it is a deterministic
+fund operating rule extraction system:
+
+- **Parse** governing-document text into numbered sections (page ranges
+  preserved via form-feed or `[[page]]` markers).
+- **Classify** each section against the approved clause taxonomy
+  (`ClauseType`: management_fee, distribution_waterfall, preferred_return,
+  carried_interest, clawback, capital_call, …).
+- **Extract** a structured JSON rule per clause with **full source
+  traceability** (document, section, page, text excerpt) and a **confidence
+  score**. Money-movement clauses are always flagged for human review.
+- **Detect** missing required operating rules and conflicts (e.g. a side-letter
+  fee override of an LPA clause) as first-class records.
+- **Review lifecycle**: `draft_ai_extracted → pending_review → approved`
+  (also `rejected`, `needs_legal_review`, `superseded`). No rule is executable
+  until it is `approved` *and* carries source traceability.
+- **Validate independently**: `/lpa/validate/*` recompute expected management
+  fees, capital calls, and distribution waterfalls from the approved rules and
+  explain every variance back to the governing source clause — the spreadsheet
+  is never simply trusted.
+
+#### POC #1 — Fund Logic Blueprint
+
+`GET /lpa/documents/{id}/blueprint` returns the consolidated **Fund Logic
+Blueprint** that powers the split-screen "Aha!" workspace, mapping directly to
+the POC #1 functional requirements:
+
+- **FR-2 Domain-targeted schema**: `fund_metadata` (fund_name, currency),
+  `waterfall_rules` (preferred_return_rate, calculation_basis,
+  gp_catch_up_provision, gp_catch_up_split, carried_interest_rate),
+  `fee_economics` (management_fee_rate, fee_basis_investment_period,
+  fee_basis_post_investment_period).
+- **FR-3 Ground-truth citations**: every field carries a `citation` with
+  `page_number`, `clause_reference`, `exact_extracted_text` (verbatim), and a
+  `bounding_box_coordinates` slot. The citation is the product — the front-end
+  click-to-trace highlights the source paragraph from these anchors.
+- **FR-4 Confidence & traffic-light**: each field exposes a confidence score
+  and a `status` of `green_confirmed` (≥90%) or `amber_review` (<75% or
+  contains a discretionary/ambiguous phrase such as "in the sole discretion of
+  the General Partner"). `side_letter_overrides` surfaces LP-specific carve-outs
+  with their own citations.
+
+> **Citation note:** ingestion is text-based (PDF text + `[[page]]`/form-feed
+> page markers), so citations resolve to page + clause + verbatim text. Pixel
+> `bounding_box_coordinates` require a coordinate-aware PDF parse layer — the
+> field is present and reserved for that next step. The two-screen UI
+> (drag-and-drop upload → split-screen blueprint/PDF with click-to-trace) is a
+> front-end build on top of this API.
+
+#### Fund Document Intelligence Workbench — Operating Logic Pack
+
+Beyond a single LPA, the Workbench ingests the whole fund document pack (LPA,
+PPM, side letters, subscription docs, investor register, bank memo, reporting
+templates — see `DocumentType`) under a document-authority hierarchy
+(`DOCUMENT_AUTHORITY`, spec §6), and assembles a governed **Fund Operating
+Logic Pack** via `GET /lpa/funds/{entity_id}/operating-pack`:
+
+- **Fund Terms Summary** — core attributes with source/confidence/traffic-light;
+  the *governing* document wins when sources disagree (LPA over PPM).
+- **Operating Rules (portable JSON)** — every rule with `plain_english_summary`,
+  `structured_rule`, `evidence_required`, and a citation.
+- **Investor Obligation Matrix** — per-investor side-letter intelligence
+  (custom reporting, restrictions, MFN, review-needed).
+- **Reporting Obligation Matrix** — fund-level + investor-specific obligations
+  (report, frequency, due date, recipient, source, owner, evidence).
+- **Obligation Calendar** — recurring rules turned into operating deadlines.
+- **Exception & Missing Terms Report** — missing required rules, side-letter
+  conflicts, and **PPM↔LPA consistency** mismatches (fee, mandate) flagged for
+  human review (`POST /lpa/funds/{id}/consistency-check`).
+
+New clause families extracted: investment mandate (asset class / geography /
+non-US permitted), tax reporting (K-1 / UBTI / ECI / FATCA), treasury (bank /
+wire / signatory), and ESG. Exports: full pack as JSON, matrices as CSV
+(Excel-ready). The pack is the spec's "Definition of Done" minus the front-end
+two-screen workbench, which builds on these endpoints.
 
 ## Design principles
 
