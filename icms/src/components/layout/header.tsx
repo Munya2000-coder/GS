@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, UserCog } from "lucide-react";
+import { LogOut, UserCog, Menu } from "lucide-react";
 import { logout } from "@/app/login/actions";
 import { Badge } from "@/components/ui/badge";
 import { NAV } from "@/lib/navigation";
@@ -19,23 +19,34 @@ export function Header({
   displayName,
   roleLabels,
   siteScope,
+  onOpenMobile,
 }: {
   displayName: string;
   roleLabels: string[];
   siteScope: string | null;
+  onOpenMobile?: () => void;
 }) {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-6 py-3">
-      <div>
-        <h1 className="text-lg font-semibold text-elms-navy">{titleFor(pathname)}</h1>
-        <p className="text-xs text-muted-foreground">
-          ELMS Health Solutions Ltd · UKVI Sponsor Compliance
-          {siteScope ? ` · ${siteScope}` : ""}
-        </p>
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b bg-white px-4 py-3 md:px-6">
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={onOpenMobile}
+          aria-label="Open navigation menu"
+          className="rounded-md p-2 text-elms-navy hover:bg-secondary md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-semibold text-elms-navy md:text-lg">{titleFor(pathname)}</h1>
+          <p className="hidden truncate text-xs text-muted-foreground sm:block">
+            ELMS Health Solutions Ltd · UKVI Sponsor Compliance
+            {siteScope ? ` · ${siteScope}` : ""}
+          </p>
+        </div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="text-right">
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        <div className="hidden text-right sm:block">
           <div className="text-sm font-medium text-elms-navy">{displayName}</div>
           <div className="flex flex-wrap justify-end gap-1">
             {roleLabels.slice(0, 2).map((r) => (

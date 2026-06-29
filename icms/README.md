@@ -123,6 +123,24 @@ Extended modules (second build phase):
   schedule, compliance-score weighting) that drives runtime behaviour; every change
   is audit-trailed.
 
+Front-end completion (third phase):
+
+- **AI-Assisted Review** (M24) — advisory findings computed across worker data
+  (missing documents, pay/CoS inconsistencies, incomplete recruitment, imminent
+  expiries), every item clearly labelled **AI-assisted / advisory only** and
+  requiring human approval (ICMS-098).
+- **CQC Evidence Mapping** (M28) — maps live compliance records to the five CQC key
+  questions (Safe, Effective, Caring, Responsive, Well-Led), linkable to UKVI and
+  CQC without duplication (ICMS-103).
+- **Policy Attestation** (M29) — controlled policy register with electronic
+  acknowledgement, per-role requirement flags, and completion tracking.
+- **Worker Self-Service Portal** (M22) — worker-submitted changes held in a pending
+  queue with HR/Compliance approval that applies to the master record (ICMS-092).
+- **Mobile-responsive shell + PWA** (M30, §8.2/8.3/10.5) — collapsible desktop rail,
+  mobile drawer with hamburger, installable web-app manifest, theme colour, and
+  accessibility (skip-to-content link, focus rings, `aria-current`). Plus loading
+  skeletons, an error boundary with plain-English messages, and empty-state guidance.
+
 ### RBAC
 
 Roles and permissions live in `src/lib/rbac.ts` (PRD Module 19 / §13). Access is

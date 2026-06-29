@@ -415,6 +415,46 @@ model RecruitmentRecord {
   updatedAt   DateTime @updatedAt
 }
 
+// Policy attestation (PRD Module 29)
+model PolicyDocument {
+  id          String   @id @default(cuid())
+  title       String
+  version     String   @default("1.0")
+  category    String?
+  sharePointUrl String?
+  publishedAt DateTime @default(now())
+  requiredRoles String  @default("") // pipe-separated role keys that must attest
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  attestations PolicyAttestation[]
+}
+
+model PolicyAttestation {
+  id          String   @id @default(cuid())
+  policyId    String
+  policy      PolicyDocument @relation(fields: [policyId], references: [id])
+  userName    String
+  role        String?
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([policyId, userName])
+}
+
+// Worker self-service change requests (PRD Module 22) — held in a pending queue.
+model SelfServiceRequest {
+  id          String   @id @default(cuid())
+  workerId    String
+  workerName  String
+  field       String   // address | phone | passport | share_code | absence | emergency_contact
+  oldValue    String?
+  newValue    String
+  status      String   @default("Pending") // Pending | Approved | Rejected
+  submittedAt DateTime @default(now())
+  reviewedBy  String?
+  reviewedAt  DateTime?
+}
+
 // System configuration (PRD §17) — all changes require approval + audit trail.
 model Configuration {
   id          String   @id @default(cuid())

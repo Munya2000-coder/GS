@@ -19,6 +19,13 @@ async function main() {
   // Wipe (dev only) in dependency-safe order.
   await prisma.auditTrail.deleteMany();
   await prisma.alert.deleteMany();
+  await prisma.policyAttestation.deleteMany();
+  await prisma.policyDocument.deleteMany();
+  await prisma.selfServiceRequest.deleteMany();
+  await prisma.configuration.deleteMany();
+  await prisma.payrollReconciliation.deleteMany();
+  await prisma.recruitmentRecord.deleteMany();
+  await prisma.rotaShift.deleteMany();
   await prisma.workerFieldChange.deleteMany();
   await prisma.carePackageAllocation.deleteMany();
   await prisma.carePackage.deleteMany();
@@ -433,6 +440,40 @@ async function main() {
       summary: JSON.stringify({ underpayments: exceptionCount, clean: seededWorkers.length - exceptionCount }),
     },
   });
+
+  // --- Policy documents + attestations (Module 29) ---
+  const policies = [
+    { title: "UKVI Sponsor Compliance Policy", version: "2.1", category: "Immigration", requiredRoles: "AUTHORISING_OFFICER|KEY_CONTACT|COMPLIANCE_MANAGER|HR_MANAGER" },
+    { title: "Right to Work Checking Policy", version: "1.4", category: "Immigration", requiredRoles: "HR_MANAGER|HR_OFFICER|COMPLIANCE_MANAGER" },
+    { title: "Data Protection & GDPR Policy", version: "3.0", category: "Information Governance", requiredRoles: "AUTHORISING_OFFICER|COMPLIANCE_MANAGER|HR_MANAGER|FINANCE_MANAGER" },
+    { title: "Safeguarding Adults Policy", version: "2.2", category: "Care Quality", requiredRoles: "CARE_OPS_MANAGER|LINE_MANAGER" },
+  ];
+  for (const p of policies) {
+    const pol = await prisma.policyDocument.create({
+      data: { ...p, sharePointUrl: "https://elmshealth.sharepoint.com/policies", publishedAt: subDays(now, 40) },
+    });
+    // Some staff have already attested.
+    await prisma.policyAttestation.create({
+      data: { policyId: pol.id, userName: "Priya Nair", role: "COMPLIANCE_MANAGER", acknowledgedAt: subDays(now, 20) },
+    });
+  }
+
+  // --- Worker self-service pending requests (Module 22) ---
+  const w1 = seededWorkers[1];
+  const w2 = seededWorkers[2];
+  if (w1) {
+    await prisma.selfServiceRequest.create({
+      data: { workerId: w1.id, workerName: w1.legalName, field: "address", oldValue: w1.address ?? "", newValue: "14 Mill Road, Cambridge, CB1 2AB", status: "Pending" },
+    });
+  }
+  if (w2) {
+    await prisma.selfServiceRequest.create({
+      data: { workerId: w2.id, workerName: w2.legalName, field: "phone", oldValue: w2.phone ?? "", newValue: "07700 900456", status: "Pending" },
+    });
+    await prisma.selfServiceRequest.create({
+      data: { workerId: w2.id, workerName: w2.legalName, field: "share_code", newValue: "W12 345 678", status: "Pending" },
+    });
+  }
 
   // --- Recompute compliance scores for all workers ---
   const allWorkers = await prisma.worker.findMany({

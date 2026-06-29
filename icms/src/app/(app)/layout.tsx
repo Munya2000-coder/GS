@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { NAV } from "@/lib/navigation";
 import { ROLES } from "@/lib/rbac";
-import { Sidebar, type SidebarItem } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+import { type SidebarItem } from "@/components/layout/sidebar";
+import { Shell } from "@/components/layout/app-shell";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
@@ -17,12 +17,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const roleLabels = user.roles.map((r) => ROLES[r].label);
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar items={items} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header displayName={user.displayName} roleLabels={roleLabels} siteScope={user.siteScope} />
-        <main className="flex-1 p-6">{children}</main>
-      </div>
-    </div>
+    <>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-elms-navy focus:px-4 focus:py-2 focus:text-white"
+      >
+        Skip to content
+      </a>
+      <Shell items={items} displayName={user.displayName} roleLabels={roleLabels} siteScope={user.siteScope}>
+        {children}
+      </Shell>
+    </>
   );
 }

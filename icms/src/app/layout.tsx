@@ -1,9 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ICMS — ELMS Health Solutions",
   description: "Immigration Compliance Management System — UKVI sponsor licence compliance platform",
+  applicationName: "ICMS",
+  appleWebApp: { capable: true, title: "ICMS", statusBarStyle: "default" },
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#00A99D",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

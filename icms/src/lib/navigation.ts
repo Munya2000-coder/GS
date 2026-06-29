@@ -25,5 +25,9 @@ export const NAV: NavItem[] = [
   { label: "Governance", href: "/governance", iconName: "Landmark", permission: "worker.view", ready: true },
   { label: "Inspection Mode", href: "/inspection", iconName: "ScanSearch", permission: "inspection.run", ready: true },
   { label: "Reports", href: "/reports", iconName: "BarChart3", permission: "reports.view", ready: true },
+  { label: "AI Review", href: "/ai-review", iconName: "Sparkles", permission: "ai.review", ready: true },
+  { label: "CQC Mapping", href: "/cqc", iconName: "HeartPulse", permission: "cqc.view", ready: true },
+  { label: "Policies", href: "/policies", iconName: "BookCheck", permission: "policy.view", ready: true },
+  { label: "Self-Service", href: "/portal", iconName: "UserCircle", permission: "selfservice.review", ready: true },
   { label: "Settings", href: "/settings", iconName: "Settings", permission: "config.manage", ready: true },
 ];
