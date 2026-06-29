@@ -31,3 +31,7 @@ yarn-error.log*
 
 # uploaded evidence (local storage adapter)
 /storage/
+
+# local test/screenshot artifacts
+/shots/
+_shots*.mjs
