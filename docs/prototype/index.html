@@ -1,0 +1,2056 @@
+<title>GS Private Capital Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* ------------------------------------------------------------------
+   Tokens — lifted from frontend/src/styles.css so the prototype and the
+   real SPA are the same product. Single committed dark world: every
+   colour is painted explicitly so the page holds on any host ground.
+   ------------------------------------------------------------------ */
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel-2:#1c222b; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --accent-dim:#1f6feb;
+  --ok:#3fb950; --warn:#d29922; --err:#f85149; --radius:6px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:var(--sans); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none;cursor:pointer}
+a:hover{text-decoration:underline}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+.mono{font-family:var(--mono);font-size:.92em}
+.muted{color:var(--muted)}
+.num,td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--mono);font-size:12.5px}
+
+/* ---------- app shell ---------- */
+.layout{
+  display:grid; grid-template-columns:240px 1fr; grid-template-rows:52px 1fr;
+  grid-template-areas:"sidebar topbar" "sidebar main"; height:100vh;
+}
+.sidebar{grid-area:sidebar;background:var(--panel);border-right:1px solid var(--border);padding:20px 0;overflow-y:auto}
+.sidebar .brand{padding:0 20px 18px;font-weight:700;color:var(--accent);font-size:15px;letter-spacing:.5px}
+.sidebar nav a{display:flex;align-items:center;gap:8px;padding:7px 20px;color:var(--text);font-size:13px;border-left:3px solid transparent}
+.sidebar nav a:hover{background:var(--panel-2);text-decoration:none}
+.sidebar nav a.active{background:var(--panel-2);border-left-color:var(--accent);color:var(--accent)}
+.sidebar nav a .tally{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--warn);background:rgba(210,153,34,.15);padding:1px 6px;border-radius:9px}
+.sidebar-section{padding:14px 20px 4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.topbar{grid-area:topbar;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:12px}
+.topbar .spacer{flex:1}
+main{grid-area:main;overflow-y:auto;padding:24px;scroll-behavior:smooth}
+/* grid items default to min-width:auto — without this a wide table stretches
+   the column and the whole page scrolls sideways instead of the table. */
+.sidebar,.topbar,main{min-width:0}
+.wrap{max-width:1180px}
+
+/* ---------- type ---------- */
+h1{font-size:22px;margin:0 0 4px;font-weight:600;text-wrap:balance}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:26px 0 10px;font-weight:600}
+.page-note{color:var(--muted);margin:0 0 18px;max-width:65ch}
+.crumb{font-size:12px;color:var(--muted);margin-bottom:10px}
+
+/* ---------- surfaces ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.grid.wide{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.card.pad-0{padding:0;overflow:hidden}
+.card.link{display:block;text-decoration:none;color:inherit;transition:border-color .12s,background .12s}
+.card.link:hover{border-color:var(--accent-dim);background:var(--panel-2);text-decoration:none}
+.kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.kpi .value{font-size:22px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+.kpi .value.sm{font-size:17px}
+.kpi .sub{font-size:11px;color:var(--muted);margin-top:4px}
+.kpi.flag .value{color:var(--warn)}
+.kpi.zero .value{color:var(--muted)}
+
+/* ---------- tables ---------- */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px;background:var(--panel);position:sticky;top:0;z-index:1;white-space:nowrap}
+tbody tr:hover{background:var(--panel-2)}
+tr.total td{font-weight:600;background:var(--panel-2)}
+.row-actions{display:flex;gap:6px;justify-content:flex-end}
+td.row-actions{text-align:right}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+/* ---------- badges & chips ---------- */
+.badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600;white-space:nowrap}
+.badge.ok{background:rgba(63,185,80,.15);color:var(--ok)}
+.badge.warn{background:rgba(210,153,34,.15);color:var(--warn)}
+.badge.err{background:rgba(248,81,73,.15);color:var(--err)}
+.badge.muted{background:rgba(139,148,158,.15);color:var(--muted)}
+.badge.info{background:rgba(88,166,255,.15);color:var(--accent)}
+.chip{display:inline-block;padding:2px 8px;border:1px solid var(--border);border-radius:99px;font-size:11px;color:var(--muted);font-family:var(--mono)}
+.chip.on{border-color:var(--accent-dim);color:var(--accent)}
+
+/* ---------- controls ---------- */
+.btn{background:var(--accent);color:#0d1117;border:none;padding:8px 14px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;transition:background .1s;white-space:nowrap}
+.btn:hover:not(:disabled){background:#79b8ff}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn.secondary:hover:not(:disabled){background:var(--panel-2)}
+.btn.ghost{background:transparent;color:var(--muted);border:none;padding:4px 8px}
+.btn.ghost:hover:not(:disabled){color:var(--text);text-decoration:underline}
+.btn.danger{background:var(--err);color:#fff}
+.btn.danger:hover:not(:disabled){background:#ff6b63}
+.btn.sm{padding:5px 10px;font-size:12px}
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.toolbar .spacer{flex:1}
+.toolbar label{margin:0}
+input[type=text],input[type=date],input[type=number],input[type=email],select,textarea{
+  background:var(--bg);color:var(--text);border:1px solid var(--border);
+  padding:8px 10px;border-radius:4px;width:100%;font-family:inherit}
+input[type=number],input[type=date]{font-family:var(--mono);font-size:13px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+label{display:block;margin-bottom:4px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.form-row{margin-bottom:12px}
+.form-row.inline{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.form-row.inline3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.form-row.check label{display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13px;color:var(--text)}
+.form-row.check input{width:auto}
+
+/* ---------- banners ---------- */
+.banner{border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:13px;display:flex;gap:10px;align-items:flex-start}
+.banner.err{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.4);color:#ffb0ab}
+.banner.info{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.3);color:#a9d0ff}
+.banner .code{font-family:var(--mono);font-size:11px;opacity:.8}
+
+/* ---------- login ---------- */
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.login-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:32px;width:440px;max-width:100%}
+.login-card h1{color:var(--accent);font-size:18px;margin-bottom:6px}
+.userpick{display:grid;gap:8px;margin:14px 0 18px}
+.userpick button{display:flex;align-items:center;gap:10px;text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;cursor:pointer;width:100%}
+.userpick button:hover{border-color:var(--accent-dim);background:var(--panel-2)}
+.userpick button.on{border-color:var(--accent)}
+.userpick .u{font-family:var(--mono);font-weight:600;min-width:70px}
+.userpick .r{font-size:11px;color:var(--muted)}
+
+/* ---------- misc ---------- */
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:150px 1fr 72px;gap:10px;align-items:center;font-size:12px}
+.bar .track{height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden}
+.bar .fill{height:100%;border-radius:99px;background:var(--accent)}
+.bar .fill.ok{background:var(--ok)} .bar .fill.warn{background:var(--warn)} .bar .fill.err{background:var(--err)}
+.bar .v{text-align:right;font-family:var(--mono);color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13px}
+.kv dt{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;align-self:center}
+.kv dd{margin:0;font-family:var(--mono);font-size:12.5px}
+.steps{list-style:none;padding:0;margin:0}
+pre.out{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:12px;overflow-x:auto;font-family:var(--mono);font-size:12px;margin:0;color:var(--muted)}
+.toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:50;max-width:380px}
+.toast{background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--ok);border-radius:4px;padding:10px 14px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:rise .18s ease-out}
+.toast.err{border-left-color:var(--err)}
+.toast.info{border-left-color:var(--accent)}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:820px){
+  .layout{grid-template-columns:1fr;grid-template-rows:52px auto 1fr;grid-template-areas:"topbar" "sidebar" "main";height:auto;min-height:100vh}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);padding:12px 0}
+  .sidebar nav{display:flex;flex-wrap:wrap;gap:2px;padding:0 12px}
+  .sidebar nav a{border-left:none;border-bottom:2px solid transparent;padding:6px 10px}
+  .sidebar nav a.active{border-left:none;border-bottom-color:var(--accent)}
+  .sidebar-section{display:none}
+  .form-row.inline,.form-row.inline3{grid-template-columns:1fr}
+  main{padding:16px}
+}
+@media (max-width:520px){
+  /* the environment label is the first thing to go when the topbar runs out of room */
+  .topbar{padding:0 12px;gap:8px}
+  .topbar > .muted:first-child{display:none}
+}
+</style>
+
+<div id="root"></div>
+<div class="toasts" id="toasts"></div>
+<script>
+"use strict";
+/* ===================================================================
+   GS Private Capital Suite — clickable prototype.
+   Mirrors app/ + frontend/ : same routes, same tables, same workflow
+   states, same RBAC, same seed data. All state is in-memory (persisted
+   per-browser); nothing talks to the API.
+   =================================================================== */
+
+/* ---------------- formatting (frontend/src/hooks/useAsync.ts) ------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cur = (n, c = "USD") => (n === null || n === undefined || n === "") ? "—"
+  : Number(n).toLocaleString("en-US", { style: "currency", currency: c, maximumFractionDigits: 0 });
+const cur2 = (n, c = "USD") => Number(n).toLocaleString("en-US", { style: "currency", currency: c, minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const num = (n, d = 0) => Number(n).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const ratio = n => (n === null || n === undefined) ? "—" : Number(n).toFixed(2) + "x";
+const pct = n => (n === null || n === undefined) ? "—" : (Number(n) * 100).toFixed(1) + "%";
+const dash = v => (v === null || v === undefined || v === "") ? "—" : esc(v);
+const r2 = n => Math.round(Number(n) * 100) / 100;
+const TODAY = "2026-01-12";                       // demo "now"
+const nowStamp = () => new Date().toISOString().slice(0, 19).replace("T", " ");
+
+/* ---------------- RBAC (app/core/security.py) ---------------------- */
+const ROLE_PERMISSIONS = {
+  fund_accountant:     ["read","create","edit","export"],
+  fund_controller:     ["read","create","edit","approve","post","export"],
+  finance_manager:     ["read","export"],
+  ops_analyst:         ["read","create","edit","export"],
+  investor_relations:  ["read","export"],
+  portfolio_analyst:   ["read","export"],
+  compliance:          ["read","export"],
+  auditor:             ["read","export"],
+  sys_admin:           ["read","create","edit","approve","post","export","admin"],
+  executive:           ["read"],
+  external:            ["read"],
+};
+const can = p => (session.user?.roles || []).some(r => (ROLE_PERMISSIONS[r] || []).includes(p));
+
+/* ---------------- seed (app/services/seed.py) ---------------------- */
+const INVESTOR_SEED = [
+  { code:"PEN-001", legal_name:"State Pension Fund A",   domicile:"US", tax:"exempt",  side:false, commit:25000000, email:"fundops@statepension-a.gov",   contact:"D. Okafor" },
+  { code:"END-002", legal_name:"University Endowment B", domicile:"US", tax:"taxable", side:false, commit:10000000, email:"treasury@endowment-b.edu",     contact:"R. Lindqvist" },
+  { code:"SWF-003", legal_name:"Sovereign Wealth Fund C",domicile:"SG", tax:"taxable", side:true,  commit:40000000, email:"privatemarkets@swf-c.gov.sg",  contact:"M. Tan" },
+  { code:"FOF-004", legal_name:"Fund of Funds D",        domicile:"LU", tax:"taxable", side:false, commit:15000000, email:"admin@fof-d.lu",              contact:"C. Weber" },
+  { code:"FAM-005", legal_name:"Family Office E",        domicile:"CH", tax:"taxable", side:false, commit:10000000, email:"office@family-e.ch",          contact:"A. Duval" },
+];
+const TOTAL_COMMIT = 100000000;
+
+function seed() {
+  const db = {
+    seq: { tx:0, call:0, dist:0, fee_run:0, wf_run:0, job:0, audit:0, period:0, step:0, batch:0, exc:0, user:4, nav:0, recon:0 },
+    users: [
+      { id:1, username:"admin",   display_name:"Admin",   email:"admin@example.com",   roles:["sys_admin","fund_controller","fund_accountant"], mfa:true,  active:true },
+      { id:2, username:"alice",   display_name:"Alice",   email:"alice@example.com",   roles:["fund_accountant","ops_analyst"],                 mfa:false, active:true },
+      { id:3, username:"bob",     display_name:"Bob",     email:"bob@example.com",     roles:["fund_controller"],                               mfa:true,  active:true },
+      { id:4, username:"charlie", display_name:"Charlie", email:"charlie@example.com", roles:["investor_relations"],                            mfa:false, active:true },
+    ],
+    entities: [{
+      id:1, code:"PE-I", legal_name:"GS Private Equity Fund I LP", short_name:"PE I",
+      entity_type:"fund", jurisdiction:"DE", vintage_year:2022, strategy:"Mid-market buyout",
+      base_currency:"USD", reporting_currency:"USD", status:"active", version:1,
+      effective_from:"2022-03-15", effective_to:null,
+    }],
+    investors: [], commitments: [], capital_accounts: [],
+    transactions: [], journal: [], calls: [], distributions: [],
+    fee_schedules: [], fee_runs: [], wf_models: [], wf_runs: [],
+    navs: [], periods: [], steps: [], batches: [], exceptions: [],
+    recon_runs: [], jobs: [], audit: [], lineage: [],
+  };
+
+  INVESTOR_SEED.forEach((s, i) => {
+    const id = i + 1;
+    db.investors.push({ id, code:s.code, legal_name:s.legal_name, short_name:s.legal_name.split(" ")[0],
+      domicile:s.domicile, tax_classification:s.tax, regulatory_classification:"professional",
+      primary_contact:s.contact, primary_email:s.email, side_letter:s.side, status:"active" });
+    db.commitments.push({ id, investor_id:id, entity_id:1, closing_id:"C1", closing_date:"2022-03-15",
+      investor_class:"A", commitment_amount:s.commit, currency:"USD" });
+    db.capital_accounts.push({ id, code:`CA-PE-I-${s.code}`, investor_id:id, entity_id:1,
+      investor_class:"A", carry_participant:false });
+  });
+
+  db.fee_schedules.push({ id:1, entity_id:1, name:"Management Fee 2%", basis:"commitment",
+    annual_rate_bps:200, periodicity:"quarterly", effective_from:"2022-03-15", effective_to:null,
+    version:1, state:"approved", created_by:"admin", approved_by:"bob" });
+
+  db.wf_models.push({ id:1, entity_id:1, name:"8/20 European", method:"european",
+    preferred_return_bps:800, catchup_percentage_bps:10000, carried_interest_bps:2000,
+    hurdle_compounding:"annual", effective_from:"2022-03-15", version:1,
+    state:"approved", created_by:"admin", approved_by:"bob" });
+
+  // --- capital calls, funded and posted (seed.py) ---
+  mkCall(db, "CC-001", "2022-06-01", "2022-06-30", 30000000, "investment", "admin", "bob", true);
+  mkCall(db, "CC-002", "2023-03-01", "2023-03-31", 25000000, "investment", "admin", "bob", true);
+
+  // --- distribution, paid and posted ---
+  mkDist(db, "DIST-001", "2025-06-01", "2025-06-30", 15000000, "return_of_capital", false, "admin", "bob", true);
+
+  // --- NAV ---
+  db.navs.push({ id:++db.seq.nav, entity_id:1, as_of:"2025-12-31", gross_asset_value:75000000,
+    liabilities:500000, ending_nav:74500000, currency:"USD", source_reference:"Q4-2025 valuation",
+    published_by:"admin", published_at:"2026-01-04 09:12:40" });
+
+  // --- an import batch still working through the queue ---
+  const batch = { id:++db.seq.batch, interface_code:"CUSTODIAN-CSV", filename:"custodian_2025-12.csv",
+    rows:3, accepted:2, rejected:1, imported_by:"alice", imported_at:"2026-01-06 07:41:02", state:"partial" };
+  db.batches.push(batch);
+  addTx(db, { date:"2025-12-18", type:"expense",    ref:"CUST-9912", amount:145000, state:"validated", maker:"alice", batch_id:batch.id, memo:"Q4 audit & tax fees" });
+  addTx(db, { date:"2025-12-22", type:"investment", ref:"CUST-9918", amount:8250000, state:"validated", maker:"alice", batch_id:batch.id, memo:"Follow-on — Project Aurora" });
+  db.exceptions.push({ id:++db.seq.exc, batch_id:batch.id, row_number:3, code:"UNKNOWN_INVESTOR",
+    message:"investor code 'PEN-01' does not match any active investor", owner:null, status:"open", note:null });
+
+  // --- accounting periods ---
+  mkPeriod(db, "quarterly", "2025-04-01", "2025-06-30", "closed");
+  mkPeriod(db, "quarterly", "2025-07-01", "2025-09-30", "closed");
+  const q4 = mkPeriod(db, "quarterly", "2025-10-01", "2025-12-31", "open");
+  mkPeriod(db, "annual",    "2025-01-01", "2025-12-31", "open");
+  [["Bank & custodian reconciliation","2026-01-05",null],
+   ["Management fee accrual","2026-01-07",1],
+   ["NAV publication","2026-01-10",2],
+   ["Investor capital account statements","2026-01-15",3]
+  ].forEach(([name, due, dep], i) => {
+    db.steps.push({ id:++db.seq.step, period_id:q4.id, name, due_date:due,
+      depends_on_order:dep, order:i + 1, status:"pending", signed_off_by:null, signed_off_at:null });
+  });
+
+  // --- job history ---
+  [["import_transactions","scheduled","succeeded","2026-01-06 07:41:00","2026-01-06 07:41:02",null],
+   ["fee_accrual","manual","succeeded","2026-01-04 11:02:10","2026-01-04 11:02:11",null],
+   ["nav_publish","manual","succeeded","2026-01-04 09:12:39","2026-01-04 09:12:40",null],
+   ["export_capital_accounts","manual","failed","2026-01-07 16:30:00","2026-01-07 16:30:04","ConnectionError: SFTP host key mismatch for reports.gs.internal"],
+   ["nightly_reconciliation","scheduled","queued",null,null,null]
+  ].forEach(([type,trigger,status,started,finished,error]) => {
+    db.jobs.push({ id:++db.seq.job, job_type:type, trigger, status, started_at:started, finished_at:finished, error });
+  });
+
+  audit(db, "admin", "seed.load", "platform:1", false, "2026-01-02 08:00:00");
+  return db;
+}
+
+/* ---------------- seed helpers ------------------------------------- */
+function proRata(total) {
+  // Allocation is by commitment, with the residual cent going to the largest
+  // commitment — the same rule as services/capital_calls.py.
+  const rows = INVESTOR_SEED.map((s, i) => ({ investor_id:i + 1, amount:r2(total * s.commit / TOTAL_COMMIT) }));
+  const drift = r2(total - rows.reduce((a, b) => a + b.amount, 0));
+  if (drift !== 0) {
+    let big = 0;
+    rows.forEach((row, i) => { if (row.amount > rows[big].amount) big = i; });
+    rows[big].amount = r2(rows[big].amount + drift);
+  }
+  return rows;
+}
+function addTx(db, t) {
+  const tx = { id:++db.seq.tx, entity_id:1, transaction_date:t.date, transaction_type:t.type,
+    source_reference:t.ref, amount:t.amount, currency:"USD", state:t.state,
+    investor_id:t.investor_id ?? null, maker:t.maker, approver:t.approver ?? null,
+    batch_id:t.batch_id ?? null, memo:t.memo ?? null };
+  db.transactions.push(tx);
+  return tx;
+}
+function mkCall(db, number, notice, due, total, purpose, maker, approver, funded) {
+  const call = { id:++db.seq.call, entity_id:1, call_number:number, notice_date:notice, due_date:due,
+    total_amount:total, currency:"USD", purpose, state:funded ? "funded" : "draft",
+    maker, approver:approver || null, allocations:proRata(total) };
+  db.calls.push(call);
+  if (funded) {
+    call.allocations.forEach(a => addTx(db, { date:due, type:"contribution", ref:number,
+      amount:a.amount, state:"posted", maker, approver, investor_id:a.investor_id,
+      memo:`Capital call ${number} funding` }));
+  }
+  return call;
+}
+function mkDist(db, number, notice, payment, total, purpose, recallable, maker, approver, paid) {
+  const d = { id:++db.seq.dist, entity_id:1, distribution_number:number, notice_date:notice,
+    payment_date:payment, total_amount:total, currency:"USD", purpose, recallable,
+    state:paid ? "paid" : "draft", maker, approver:approver || null, allocations:proRata(total) };
+  db.distributions.push(d);
+  if (paid) {
+    d.allocations.forEach(a => addTx(db, { date:payment, type:"distribution", ref:number,
+      amount:a.amount, state:"posted", maker, approver, investor_id:a.investor_id,
+      memo:`Distribution ${number} payout` }));
+  }
+  return d;
+}
+function mkPeriod(db, type, start, end, status) {
+  const p = { id:++db.seq.period, entity_id:1, period_type:type, start_date:start, end_date:end,
+    status, reopen_reason:null };
+  db.periods.push(p);
+  return p;
+}
+function audit(db, actor, action, object, privileged, when) {
+  db.audit.unshift({ id:++db.seq.audit, at:when || nowStamp(), actor, action, object,
+    privileged:!!privileged });
+}
+</script>
+<script>
+"use strict";
+/* ===================== derived views (services/*) ==================== */
+const posted = () => db.transactions.filter(t => t.state === "posted");
+const sumTx = type => posted().filter(t => t.transaction_type === type).reduce((a, t) => a + t.amount, 0);
+const contributed = () => sumTx("contribution");
+const distributed = () => sumTx("distribution");
+const endingNav = () => { const n = latestNav(); return n ? n.ending_nav : 0; };
+const latestNav = () => db.navs.slice().sort((a, b) => a.as_of < b.as_of ? 1 : -1)[0] || null;
+const committed = () => db.commitments.reduce((a, c) => a + c.commitment_amount, 0);
+
+function performance() {
+  const c = contributed(), d = distributed(), n = endingNav(), k = committed();
+  const flows = [];
+  posted().forEach(t => flows.push({ d:t.transaction_date, a:t.transaction_type === "contribution" ? -t.amount : t.amount }));
+  const nav = latestNav();
+  if (nav && n > 0) flows.push({ d:nav.as_of, a:n });
+  return {
+    irr: irr(flows), tvpi: c ? (d + n) / c : null, dpi: c ? d / c : null,
+    rvpi: c ? n / c : null, moic: c ? (d + n) / c : null, pic: k ? c / k : null,
+  };
+}
+/* Newton-ish bisection over dated cashflows — services/performance.py */
+function irr(flows) {
+  if (flows.length < 2) return null;
+  const srt = flows.slice().sort((a, b) => a.d < b.d ? -1 : 1);
+  const t0 = new Date(srt[0].d).getTime();
+  const npv = r => srt.reduce((s, f) =>
+    s + f.a / Math.pow(1 + r, (new Date(f.d).getTime() - t0) / 31536000000), 0);
+  if (npv(-0.9999) * npv(10) > 0) return null;
+  let lo = -0.9999, hi = 10;
+  for (let i = 0; i < 200; i++) { const m = (lo + hi) / 2; if (npv(m) > 0) lo = m; else hi = m; }
+  return lo;
+}
+function accountFor(investorId) {
+  const share = INVESTOR_SEED[investorId - 1].commit / TOTAL_COMMIT;
+  const c = posted().filter(t => t.investor_id === investorId && t.transaction_type === "contribution")
+    .reduce((a, t) => a + t.amount, 0);
+  const d = posted().filter(t => t.investor_id === investorId && t.transaction_type === "distribution")
+    .reduce((a, t) => a + t.amount, 0);
+  const nav = r2(endingNav() * share);
+  return { contributed:c, distributed:d, nav, pnl:r2(d + nav - c), share };
+}
+function trialBalance() {
+  const rows = [
+    { account:"1000", name:"Cash at bank",           debit:contributed(), credit:distributed() },
+    { account:"3000", name:"Capital contributions",  debit:0,             credit:contributed() },
+    { account:"3100", name:"Distributions paid",     debit:distributed(), credit:0 },
+  ];
+  rows.forEach(r => r.net = r.debit - r.credit);
+  return rows;
+}
+const pendingApprovals = () =>
+  db.transactions.filter(t => t.state === "validated").length +
+  db.calls.filter(c => c.state === "draft").length +
+  db.distributions.filter(d => d.state === "draft").length +
+  db.fee_schedules.filter(f => f.state === "draft").length +
+  db.wf_models.filter(m => m.state === "draft").length +
+  db.wf_runs.filter(r => r.state === "draft").length;
+const openExceptions = () => db.exceptions.filter(e => e.status === "open").length;
+const reconBreaks = () => db.recon_runs.reduce((a, r) => a + r.breaks, 0);
+const failedJobs = () => db.jobs.filter(j => j.status === "failed").length;
+const entityName = id => (db.entities.find(e => e.id === id) || {}).code || `#${id}`;
+const investorName = id => (db.investors.find(i => i.id === id) || {}).legal_name || "—";
+const investorCode = id => (db.investors.find(i => i.id === id) || {}).code || "—";
+
+/* ===================== workflow guards ============================== */
+class WorkflowError extends Error {}
+function requirePerm(p) {
+  if (!can(p)) throw new WorkflowError(`403 · missing permission: ${p}`);
+}
+function requireNotMaker(maker) {
+  if (maker === session.user.username)
+    throw new WorkflowError("409 · maker cannot approve own submission");
+}
+
+/* ===================== store & session ============================== */
+const KEY = "gs-suite-prototype-v1";
+let db = null;
+let session = { user:null, route:"/", banner:null, forms:{} };
+
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify({ db, user:session.user })); } catch (e) {}
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const s = JSON.parse(raw); if (s && s.db) { db = s.db; session.user = s.user || null; return; } }
+  } catch (e) {}
+  db = seed();
+}
+function resetDemo() {
+  db = seed(); session.user = null; session.banner = null; session.forms = {};
+  try { localStorage.removeItem(KEY); } catch (e) {}
+  location.hash = "#/";
+  toast("Demo data reset to the seeded fund.", "info");
+  render();
+}
+
+function toast(msg, kind) {
+  const el = document.createElement("div");
+  el.className = "toast " + (kind || "");
+  el.textContent = msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
+
+/* ===================== shell ======================================== */
+const NAV = [
+  ["Dashboard", "/"],
+  ["§", "Structure"], ["Funds", "/funds"], ["Investors", "/investors"],
+  ["§", "Operations"], ["Transactions", "/transactions"], ["Import", "/transactions/import"],
+  ["Capital Calls", "/capital-calls"], ["Distributions", "/distributions"], ["NAV", "/nav"],
+  ["§", "Accounting"], ["Fees", "/fees"], ["Waterfall", "/waterfall"],
+  ["Periods", "/periods"], ["Reconciliation", "/reconciliation"],
+  ["§", "Reporting"], ["Reports", "/reports"], ["Operations", "/operations"], ["Audit", "/audit"],
+  ["§", "System"], ["Admin", "/admin"],
+];
+const TALLY = {
+  "/transactions": () => db.transactions.filter(t => t.state === "validated").length,
+  "/capital-calls": () => db.calls.filter(c => c.state === "draft").length,
+  "/distributions": () => db.distributions.filter(d => d.state === "draft").length,
+  "/reconciliation": () => openExceptions(),
+  "/operations": () => failedJobs(),
+};
+function sidebar(route) {
+  return NAV.map(([a, b]) => {
+    if (a === "§") return `<div class="sidebar-section">${esc(b)}</div>`;
+    const active = route === b || (b !== "/" && route.startsWith(b + "/") && b !== "/transactions");
+    const n = TALLY[b] ? TALLY[b]() : 0;
+    return `<a href="#${b}" class="${active ? "active" : ""}">${esc(a)}${n ? `<span class="tally">${n}</span>` : ""}</a>`;
+  }).join("");
+}
+function banner() {
+  if (!session.banner) return "";
+  const b = session.banner;
+  return `<div class="banner ${b.kind || "err"}"><div>${esc(b.text)}</div></div>`;
+}
+function fail(e) {
+  session.banner = { kind:"err", text:e instanceof WorkflowError ? e.message : String(e && e.message || e) };
+}
+</script>
+<script>
+"use strict";
+/* ===================== small view helpers =========================== */
+const OK_S = new Set(["active","posted","approved","succeeded","matched","signed_off","paid","funded","closed","resolved"]);
+const WARN_S = new Set(["draft","pending_review","soft_close","reopened","queued","running","pending","in_review","validated","open","partial","assigned"]);
+const ERR_S = new Set(["rejected","failed","break","cancelled","blocked"]);
+function badge(v) {
+  const s = String(v ?? "").toLowerCase();
+  const c = OK_S.has(s) ? "ok" : WARN_S.has(s) ? "warn" : ERR_S.has(s) ? "err" : "muted";
+  return `<span class="badge ${c}">${esc(s.replace(/_/g, " "))}</span>`;
+}
+const kpi = (label, value, sub, cls) =>
+  `<div class="card kpi ${cls || ""}"><div class="label">${esc(label)}</div>
+   <div class="value${String(value).length > 11 ? " sm" : ""}">${esc(value)}</div>
+   ${sub ? `<div class="sub">${esc(sub)}</div>` : ""}</div>`;
+const tbl = (head, body, cols, empty) =>
+  `<div class="card pad-0"><div class="tablewrap"><table><thead><tr>${head}</tr></thead>
+   <tbody>${body || `<tr><td colspan="${cols}"><div class="empty">${esc(empty)}</div></td></tr>`}</tbody></table></div></div>`;
+/* A button that is disabled — and says why — when the signed-in user lacks
+   the permission the API would enforce. */
+function actBtn(label, act, id, perm, cls) {
+  const ok = !perm || can(perm);
+  return `<button class="btn ${cls || "secondary"} sm" data-act="${act}" data-id="${id}"${ok ? "" : ` disabled title="requires '${perm}' permission — ${esc(session.user.username)} has ${esc((session.user.roles||[]).join(", "))}"`}>${esc(label)}</button>`;
+}
+function toggleBtn(key, showLabel, perm) {
+  const need = perm || "create";
+  if (!can(need)) return `<button class="btn" disabled title="requires '${need}' permission — ${esc(session.user.username)} has ${esc((session.user.roles||[]).join(", "))}">${esc(showLabel)}</button>`;
+  return `<button class="btn" data-act="toggle" data-id="${key}">${session.forms[key] ? "Cancel" : showLabel}</button>`;
+}
+
+/* ===================== router ======================================= */
+const ROUTES = [
+  [/^\/$/,                    () => pageDashboard()],
+  [/^\/funds$/,               () => pageFunds()],
+  [/^\/funds\/(\d+)$/,        m => pageFundDetail(+m[1])],
+  [/^\/investors$/,           () => pageInvestors()],
+  [/^\/investors\/(\d+)$/,    m => pageInvestorDetail(+m[1])],
+  [/^\/transactions$/,        () => pageTransactions()],
+  [/^\/transactions\/import$/,() => pageImport()],
+  [/^\/capital-calls$/,       () => pageCalls()],
+  [/^\/distributions$/,       () => pageDistributions()],
+  [/^\/nav$/,                 () => pageNav()],
+  [/^\/fees$/,                () => pageFees()],
+  [/^\/waterfall$/,           () => pageWaterfall()],
+  [/^\/periods$/,             () => pagePeriods()],
+  [/^\/reconciliation$/,      () => pageRecon()],
+  [/^\/reports$/,             () => pageReports()],
+  [/^\/operations$/,          () => pageOperations()],
+  [/^\/audit$/,               () => pageAudit()],
+  [/^\/admin$/,               () => pageAdmin()],
+];
+function render() {
+  const root = document.getElementById("root");
+  if (!session.user) { root.innerHTML = pageLogin(); persist(); return; }
+  const route = session.route;
+  let body = null;
+  for (const [re, fn] of ROUTES) { const m = route.match(re); if (m) { body = fn(m); break; } }
+  if (body === null) { location.hash = "#/"; return; }
+  root.innerHTML = `
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">GS · Private Capital</div>
+      <nav>${sidebar(route)}</nav>
+    </aside>
+    <header class="topbar">
+      <span class="muted">development</span>
+      <span class="chip on">prototype</span>
+      <div class="spacer"></div>
+      <span class="mono">${esc(session.user.username)}</span>
+      <button class="btn ghost" data-act="reset">Reset demo</button>
+      <button class="btn ghost" data-act="signout">sign out</button>
+    </header>
+    <main><div class="wrap">${banner()}${body}</div></main>
+  </div>`;
+  persist();
+}
+
+/* ===================== login ======================================== */
+function pageLogin() {
+  return `<div class="login-wrap"><form class="login-card" data-form="login">
+    <h1>GS Private Capital Suite</h1>
+    <p class="muted" style="margin-top:0">Header-based auth (<span class="mono">X-User-Id</span>). Pick a seeded
+    identity — each one carries different permissions, so the approve and post
+    controls change with who you are.</p>
+    ${banner()}
+    <div class="userpick">
+      ${db.users.map(u => `<button type="button" data-act="pick" data-id="${esc(u.username)}">
+        <span class="u">${esc(u.username)}</span>
+        <span class="r">${esc(u.roles.join(" · "))}</span></button>`).join("")}
+    </div>
+    <div class="form-row">
+      <label>Username</label>
+      <input type="text" name="username" id="loginUser" value="admin" autocomplete="off" required>
+    </div>
+    <button class="btn" type="submit">Sign in</button>
+  </form></div>`;
+}
+
+/* ===================== dashboard ==================================== */
+const QUICK = [
+  ["/funds","New fund","Create an entity / fund"],
+  ["/investors","New investor","Onboard an LP"],
+  ["/capital-calls","Issue capital call","Generate & allocate"],
+  ["/distributions","Distribute proceeds","Pro-rata payout"],
+  ["/transactions/import","Import transactions","JSON or CSV"],
+  ["/fees","Run fees","Accrue management fees"],
+  ["/waterfall","Run waterfall","Carry calculation"],
+  ["/nav","Publish NAV","Fund-level snapshot"],
+  ["/periods","Close period","Soft / hard close"],
+  ["/reports","Reports & exports","Trial balance, statements"],
+  ["/reconciliation","Reconcile","Batches & breaks"],
+  ["/admin","User admin","Roles & access"],
+];
+function pageDashboard() {
+  const p = performance();
+  const exc = openExceptions(), brk = reconBreaks(), fj = failedJobs(), pa = pendingApprovals();
+  return `<h1>Dashboard</h1>
+  <p class="page-note">Signed in as <span class="mono">${esc(session.user.username)}</span> · roles
+    ${(session.user.roles || []).map(r => `<span class="chip">${esc(r)}</span>`).join(" ")}</p>
+
+  <h2>Portfolio</h2>
+  <div class="grid">
+    ${kpi("Funds", db.entities.length, `${db.entities.filter(e => e.status === "active").length} active`)}
+    ${kpi("Investors", db.investors.length)}
+    ${kpi("Committed", cur(committed()))}
+    ${kpi("Contributed", cur(contributed()), pct(contributed() / committed()) + " called")}
+    ${kpi("Distributed", cur(distributed()))}
+    ${kpi("NAV", cur(endingNav()), latestNav() ? "as of " + latestNav().as_of : "not published")}
+  </div>
+
+  <h2>Performance</h2>
+  <div class="grid">
+    ${kpi("Net IRR", p.irr === null ? "—" : pct(p.irr))}
+    ${kpi("TVPI", ratio(p.tvpi))}
+    ${kpi("DPI", ratio(p.dpi))}
+    ${kpi("RVPI", ratio(p.rvpi))}
+    ${kpi("MOIC", ratio(p.moic))}
+    ${kpi("PIC", ratio(p.pic))}
+  </div>
+
+  <h2>Operational</h2>
+  <div class="grid">
+    ${kpi("Open exceptions", exc, exc ? "in the import queue" : "queue clear", exc ? "flag" : "zero")}
+    ${kpi("Recon breaks", brk, brk ? "unmatched" : "none outstanding", brk ? "flag" : "zero")}
+    ${kpi("Failed jobs", fj, fj ? "needs a retry" : "all green", fj ? "flag" : "zero")}
+    ${kpi("Pending approvals", pa, pa ? "waiting on a checker" : "nothing waiting", pa ? "flag" : "zero")}
+  </div>
+
+  <h2>Quick actions</h2>
+  <div class="grid">
+    ${QUICK.map(([to, label, hint]) => `<a class="card link" href="#${to}">
+      <div style="color:var(--accent);font-size:13px;font-weight:600">${esc(label)} →</div>
+      <div class="muted" style="font-size:12px;margin-top:4px">${esc(hint)}</div></a>`).join("")}
+  </div>`;
+}
+
+/* ===================== funds ======================================== */
+function pageFunds() {
+  const rows = db.entities.map(e => `<tr>
+    <td class="mono"><a href="#/funds/${e.id}">${esc(e.code)}</a></td>
+    <td>${esc(e.legal_name)}</td><td>${esc(e.entity_type)}</td>
+    <td class="num">${dash(e.vintage_year)}</td><td>${dash(e.strategy)}</td>
+    <td>${esc(e.jurisdiction)}</td><td class="mono">${esc(e.base_currency)}</td>
+    <td>${badge(e.status)}</td></tr>`).join("");
+  return `<h1>Funds</h1>
+  <p class="page-note">Entities are effective-dated: every edit opens a new version, so a
+  report run for an old date reproduces against the structure in force then.</p>
+  <div class="toolbar"><div class="spacer"></div>${toggleBtn("fund", "+ New fund")}</div>
+  ${session.forms.fund ? `<form class="card" data-form="fund" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Code</label><input type="text" name="code" required minlength="2" maxlength="32" placeholder="PE-II"></div>
+      <div><label>Type</label><select name="entity_type">
+        ${["fund","sub_fund","spv","blocker","feeder","co_invest","master","aiv"].map(t => `<option value="${t}">${t.replace(/_/g," ").replace(/\b\w/g, c => c.toUpperCase())}</option>`).join("")}
+      </select></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Legal name</label><input type="text" name="legal_name" required placeholder="GS Private Equity Fund II LP"></div>
+      <div><label>Short name</label><input type="text" name="short_name" required placeholder="PE II"></div>
+    </div>
+    <div class="form-row inline3">
+      <div><label>Jurisdiction</label><input type="text" name="jurisdiction" value="DE" required></div>
+      <div><label>Vintage year</label><input type="number" name="vintage_year" value="2026"></div>
+      <div><label>Base currency</label><input type="text" name="base_currency" value="USD" maxlength="3" required></div>
+    </div>
+    <div class="form-row"><label>Strategy</label><input type="text" name="strategy" placeholder="e.g. Mid-market buyout"></div>
+    <button class="btn" type="submit">Create</button>
+  </form>` : ""}
+  ${tbl(`<th>Code</th><th>Legal name</th><th>Type</th><th class="num">Vintage</th><th>Strategy</th><th>Jurisdiction</th><th>Currency</th><th>Status</th>`,
+        rows, 8, "No funds yet.")}`;
+}
+
+function pageFundDetail(id) {
+  const e = db.entities.find(x => x.id === id);
+  if (!e) return `<h1>Fund not found</h1><p class="page-note"><a href="#/funds">Back to funds</a></p>`;
+  const p = performance();
+  const txs = db.transactions.filter(t => t.entity_id === id)
+    .slice().sort((a, b) => a.transaction_date < b.transaction_date ? 1 : -1).slice(0, 12);
+  return `<div class="crumb"><a href="#/funds">Funds</a> / ${esc(e.code)}</div>
+  <h1>${esc(e.legal_name)}</h1>
+  <p class="page-note">${esc(e.strategy || "—")} · vintage ${esc(e.vintage_year)} · ${esc(e.jurisdiction)} · ${badge(e.status).replace(/<[^>]+>/g, "")}</p>
+  <div class="card" style="margin-bottom:4px"><dl class="kv">
+    <dt>Code</dt><dd>${esc(e.code)}</dd>
+    <dt>Type</dt><dd>${esc(e.entity_type)}</dd>
+    <dt>Version</dt><dd>v${e.version} · effective from ${esc(e.effective_from)}</dd>
+    <dt>Currency</dt><dd>${esc(e.base_currency)} base / ${esc(e.reporting_currency)} reporting</dd>
+    <dt>Fee schedule</dt><dd><a href="#/fees">${esc((db.fee_schedules[0] || {}).name || "—")}</a></dd>
+    <dt>Waterfall</dt><dd><a href="#/waterfall">${esc((db.wf_models[0] || {}).name || "—")}</a></dd>
+  </dl></div>
+
+  <h2>Capital</h2>
+  <div class="grid">
+    ${kpi("Committed", cur(committed()))}
+    ${kpi("Contributed", cur(contributed()))}
+    ${kpi("Unfunded", cur(committed() - contributed()))}
+    ${kpi("Distributed", cur(distributed()))}
+    ${kpi("NAV", cur(endingNav()))}
+  </div>
+
+  <h2>Performance</h2>
+  <div class="grid">
+    ${kpi("Net IRR", p.irr === null ? "—" : pct(p.irr))}
+    ${kpi("TVPI", ratio(p.tvpi))}${kpi("DPI", ratio(p.dpi))}
+    ${kpi("RVPI", ratio(p.rvpi))}${kpi("PIC", ratio(p.pic))}
+  </div>
+
+  <h2>Investors</h2>
+  ${tbl(`<th>Code</th><th>Legal name</th><th class="num">Commitment</th><th class="num">Share</th><th class="num">Contributed</th><th class="num">Unfunded</th>`,
+    db.commitments.map(c => {
+      const a = accountFor(c.investor_id);
+      return `<tr><td class="mono"><a href="#/investors/${c.investor_id}">${esc(investorCode(c.investor_id))}</a></td>
+      <td>${esc(investorName(c.investor_id))}</td>
+      <td class="num">${cur(c.commitment_amount)}</td>
+      <td class="num">${pct(a.share)}</td>
+      <td class="num">${cur(a.contributed)}</td>
+      <td class="num">${cur(c.commitment_amount - a.contributed)}</td></tr>`;
+    }).join("") + `<tr class="total"><td colspan="2">Total</td>
+      <td class="num">${cur(committed())}</td><td class="num">100.0%</td>
+      <td class="num">${cur(contributed())}</td>
+      <td class="num">${cur(committed() - contributed())}</td></tr>`, 6, "")}
+
+  <h2>Recent transactions</h2>
+  ${tbl(`<th>Date</th><th>Type</th><th>Reference</th><th>Investor</th><th class="num">Amount</th><th>State</th>`,
+    txs.map(t => `<tr><td class="mono">${esc(t.transaction_date)}</td><td>${esc(t.transaction_type)}</td>
+      <td class="mono">${esc(t.source_reference)}</td><td>${t.investor_id ? esc(investorCode(t.investor_id)) : "—"}</td>
+      <td class="num">${cur(t.amount)}</td><td>${badge(t.state)}</td></tr>`).join(""), 6, "No transactions.")}`;
+}
+</script>
+<script>
+"use strict";
+/* ===================== investors ==================================== */
+function pageInvestors() {
+  const rows = db.investors.map(i => {
+    const c = db.commitments.find(x => x.investor_id === i.id);
+    return `<tr>
+    <td class="mono"><a href="#/investors/${i.id}">${esc(i.code)}</a></td>
+    <td>${esc(i.legal_name)}</td><td>${esc(i.domicile)}</td>
+    <td class="num">${c ? cur(c.commitment_amount) : "—"}</td>
+    <td class="muted">${dash(i.primary_email)}</td>
+    <td>${i.side_letter ? '<span class="badge warn">yes</span>' : '<span class="badge muted">no</span>'}</td>
+    <td>${badge(i.status)}</td></tr>`;
+  }).join("");
+  return `<h1>Investors</h1>
+  <p class="page-note">Each LP carries commitments per closing and one capital account per fund.
+  A side-letter flag marks investors whose economics need a bespoke check before fee and carry runs.</p>
+  <div class="toolbar"><div class="spacer"></div>${toggleBtn("inv", "+ New investor")}</div>
+  ${session.forms.inv ? `<form class="card" data-form="inv" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Code</label><input type="text" name="code" required minlength="2" maxlength="32" placeholder="PEN-006"></div>
+      <div><label>Domicile</label><input type="text" name="domicile" value="US" required maxlength="2"></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Legal name</label><input type="text" name="legal_name" required></div>
+      <div><label>Short name</label><input type="text" name="short_name" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Tax classification</label><input type="text" name="tax_classification" placeholder="e.g. exempt"></div>
+      <div><label>Primary email</label><input type="email" name="primary_email"></div>
+    </div>
+    <div class="form-row check"><label><input type="checkbox" name="side_letter"> Side-letter in place</label></div>
+    <button class="btn" type="submit">Create</button>
+  </form>` : ""}
+  ${tbl(`<th>Code</th><th>Legal name</th><th>Domicile</th><th class="num">Commitment</th><th>Email</th><th>Side-letter</th><th>Status</th>`,
+        rows, 7, "No investors yet.")}`;
+}
+
+function pageInvestorDetail(id) {
+  const i = db.investors.find(x => x.id === id);
+  if (!i) return `<h1>Investor not found</h1><p class="page-note"><a href="#/investors">Back to investors</a></p>`;
+  const c = db.commitments.find(x => x.investor_id === id);
+  const a = accountFor(id);
+  const ca = db.capital_accounts.find(x => x.investor_id === id);
+  const txs = db.transactions.filter(t => t.investor_id === id)
+    .slice().sort((x, y) => x.transaction_date < y.transaction_date ? 1 : -1);
+  return `<div class="crumb"><a href="#/investors">Investors</a> / ${esc(i.code)}</div>
+  <h1>${esc(i.legal_name)}</h1>
+  <p class="page-note">${esc(i.domicile)} · ${esc(i.tax_classification || "—")} ·
+    ${i.side_letter ? "side-letter in place" : "standard terms"}</p>
+  <div class="card"><dl class="kv">
+    <dt>Code</dt><dd>${esc(i.code)}</dd>
+    <dt>Contact</dt><dd>${dash(i.primary_contact)} · ${dash(i.primary_email)}</dd>
+    <dt>Regulatory</dt><dd>${dash(i.regulatory_classification)}</dd>
+    <dt>Capital account</dt><dd>${esc(ca ? ca.code : "—")}</dd>
+  </dl></div>
+
+  <h2>Position</h2>
+  <div class="grid">
+    ${kpi("Commitment", cur(c ? c.commitment_amount : 0), "class " + (c ? c.investor_class : "—"))}
+    ${kpi("Contributed", cur(a.contributed), pct(c ? a.contributed / c.commitment_amount : 0) + " called")}
+    ${kpi("Unfunded", cur((c ? c.commitment_amount : 0) - a.contributed))}
+    ${kpi("Distributed", cur(a.distributed))}
+    ${kpi("NAV", cur(a.nav), pct(a.share) + " of fund")}
+    ${kpi("Net P&L", cur(a.pnl))}
+  </div>
+
+  <h2>Commitments</h2>
+  ${tbl(`<th>ID</th><th>Fund</th><th>Closing</th><th>Date</th><th>Class</th><th class="num">Amount</th><th>Currency</th>`,
+    c ? `<tr><td class="mono">${c.id}</td><td class="mono"><a href="#/funds/${c.entity_id}">${esc(entityName(c.entity_id))}</a></td>
+      <td>${esc(c.closing_id)}</td><td class="mono">${esc(c.closing_date)}</td><td>${esc(c.investor_class)}</td>
+      <td class="num">${cur(c.commitment_amount)}</td><td class="mono">${esc(c.currency)}</td></tr>` : "", 7, "No commitments.")}
+
+  <h2>Capital account</h2>
+  ${tbl(`<th>Code</th><th>Fund</th><th>Class</th><th class="num">Contributed</th><th class="num">Distributed</th><th class="num">NAV</th><th class="num">P&amp;L</th><th>Carry</th>`,
+    ca ? `<tr><td class="mono">${esc(ca.code)}</td><td class="mono">${esc(entityName(ca.entity_id))}</td>
+      <td>${esc(ca.investor_class)}</td><td class="num">${cur(a.contributed)}</td>
+      <td class="num">${cur(a.distributed)}</td><td class="num">${cur(a.nav)}</td>
+      <td class="num">${cur(a.pnl)}</td><td>${ca.carry_participant ? '<span class="badge info">yes</span>' : '<span class="badge muted">no</span>'}</td></tr>` : "", 8, "")}
+
+  <h2>Transactions</h2>
+  ${tbl(`<th>Date</th><th>Type</th><th>Reference</th><th class="num">Amount</th><th>State</th>`,
+    txs.map(t => `<tr><td class="mono">${esc(t.transaction_date)}</td><td>${esc(t.transaction_type)}</td>
+      <td class="mono">${esc(t.source_reference)}</td><td class="num">${cur(t.amount)}</td>
+      <td>${badge(t.state)}</td></tr>`).join(""), 5, "No transactions.")}`;
+}
+
+/* ===================== transactions ================================= */
+function pageTransactions() {
+  const f = session.forms.txState || "";
+  const list = db.transactions.filter(t => !f || t.state === f)
+    .slice().sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : a.transaction_date > b.transaction_date ? -1 : b.id - a.id));
+  const rows = list.map(t => `<tr>
+    <td class="mono">${t.id}</td><td class="mono">${esc(t.transaction_date)}</td>
+    <td>${esc(t.transaction_type)}</td><td class="mono">${esc(t.source_reference)}</td>
+    <td>${t.investor_id ? esc(investorCode(t.investor_id)) : "—"}</td>
+    <td class="num">${cur(t.amount)}</td><td class="mono">${esc(t.currency)}</td>
+    <td class="mono muted">${esc(t.maker)}</td><td>${badge(t.state)}</td>
+    <td class="row-actions">
+      ${t.state === "validated" ? actBtn("Approve", "tx-approve", t.id, "approve") : ""}
+      ${t.state === "approved" ? actBtn("Post", "tx-post", t.id, "post", "") : ""}
+    </td></tr>`).join("");
+  return `<h1>Transactions</h1>
+  <p class="page-note">Maker-checker: a transaction moves
+  <span class="mono">draft → validated → approved → posted</span>, and the approver may not be
+  the maker. Only posted transactions reach the ledger and the reports.</p>
+  <div class="toolbar">
+    <label style="margin:0">State</label>
+    <select data-act="tx-filter" style="width:180px">
+      ${["","draft","validated","approved","posted","rejected"].map(v =>
+        `<option value="${v}"${v === f ? " selected" : ""}>${v ? v.replace(/\b\w/g, c => c.toUpperCase()) : "All"}</option>`).join("")}
+    </select>
+    <span class="muted">${list.length} of ${db.transactions.length}</span>
+    <div class="spacer"></div>
+    <a class="btn secondary" href="#/transactions/import" style="text-decoration:none">Import</a>
+  </div>
+  ${tbl(`<th>ID</th><th>Date</th><th>Type</th><th>Reference</th><th>Investor</th><th class="num">Amount</th><th>Cur</th><th>Maker</th><th>State</th><th></th>`,
+        rows, 10, "No transactions match the filter.")}`;
+}
+
+function pageImport() {
+  const b = session.forms.lastBatch ? db.batches.find(x => x.id === session.forms.lastBatch) : null;
+  return `<h1>Import transactions</h1>
+  <p class="page-note">Rows are validated against the interface contract before anything lands.
+  Accepted rows enter the queue as <span class="mono">validated</span>; rejected rows become
+  exceptions with an owner and a code.</p>
+  <form class="card" data-form="import" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Interface</label><select name="interface_code">
+        <option value="CUSTODIAN-CSV">CUSTODIAN-CSV — custodian daily activity</option>
+        <option value="GL-JSON">GL-JSON — general ledger journal feed</option>
+        <option value="ADMIN-XLSX">ADMIN-XLSX — administrator trial balance</option>
+      </select></div>
+      <div><label>File name</label><input type="text" name="filename" value="custodian_2026-01.csv" required></div>
+    </div>
+    <div class="form-row">
+      <label>Payload — one row per line: date, type, reference, investor code, amount</label>
+      <textarea name="payload" rows="6" spellcheck="false" style="font-family:var(--mono);font-size:12px">2026-01-08, expense, CUST-1004, , 62500
+2026-01-09, contribution, CUST-1005, SWF-003, 1200000
+2026-01-09, contribution, CUST-1006, PEN-01, 750000</textarea>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Validate &amp; import</button>
+  </form>
+  ${b ? `<h2>Batch #${b.id}</h2>
+  <div class="grid">
+    ${kpi("Rows", b.rows)}${kpi("Accepted", b.accepted)}
+    ${kpi("Rejected", b.rejected, b.rejected ? "sent to exceptions" : "", b.rejected ? "flag" : "zero")}
+    ${kpi("State", b.state)}
+  </div>
+  <p class="page-note" style="margin-top:14px">Accepted rows are waiting in
+    <a href="#/transactions">Transactions</a>${b.rejected ? ` · rejected rows are in the <a href="#/reconciliation">exception queue</a>` : ""}.</p>` : ""}
+
+  <h2>Import history</h2>
+  ${tbl(`<th>ID</th><th>Interface</th><th>File</th><th class="num">Rows</th><th class="num">Accepted</th><th class="num">Rejected</th><th>By</th><th>When</th><th>State</th>`,
+    db.batches.slice().reverse().map(x => `<tr><td class="mono">${x.id}</td><td class="mono">${esc(x.interface_code)}</td>
+      <td>${esc(x.filename)}</td><td class="num">${x.rows}</td><td class="num">${x.accepted}</td>
+      <td class="num">${x.rejected}</td><td class="mono muted">${esc(x.imported_by)}</td>
+      <td class="mono muted">${esc(x.imported_at)}</td><td>${badge(x.state)}</td></tr>`).join(""), 9, "Nothing imported yet.")}`;
+}
+</script>
+<script>
+"use strict";
+/* ===================== capital calls ================================ */
+function allocTable(alloc, currency) {
+  return `<div class="tablewrap"><table>
+    <thead><tr><th>Investor</th><th class="num">Commitment</th><th class="num">Share</th><th class="num">Allocated</th></tr></thead>
+    <tbody>${alloc.map(a => {
+      const c = db.commitments.find(x => x.investor_id === a.investor_id);
+      return `<tr><td class="mono">${esc(investorCode(a.investor_id))}</td>
+        <td class="num">${cur(c.commitment_amount)}</td>
+        <td class="num">${pct(c.commitment_amount / committed())}</td>
+        <td class="num">${cur2(a.amount, currency)}</td></tr>`;
+    }).join("")}
+    <tr class="total"><td>Total</td><td class="num">${cur(committed())}</td><td class="num">100.0%</td>
+      <td class="num">${cur2(alloc.reduce((x, y) => x + y.amount, 0), currency)}</td></tr></tbody></table></div>`;
+}
+
+function pageCalls() {
+  const rows = db.calls.slice().reverse().map(c => `<tr>
+    <td class="mono"><a data-act="expand" data-id="call-${c.id}">${esc(c.call_number)}</a></td>
+    <td class="mono">${esc(entityName(c.entity_id))}</td>
+    <td class="mono">${esc(c.notice_date)}</td><td class="mono">${esc(c.due_date)}</td>
+    <td class="num">${cur(c.total_amount)}</td><td>${esc(c.purpose.replace(/_/g, " "))}</td>
+    <td class="mono muted">${esc(c.maker)}</td><td>${badge(c.state)}</td>
+    <td class="row-actions">
+      ${c.state === "draft" ? actBtn("Approve", "call-approve", c.id, "approve") : ""}
+      ${c.state === "approved" ? actBtn("Fund", "call-fund", c.id, "post", "") : ""}
+    </td></tr>
+    ${session.forms["call-" + c.id] ? `<tr><td colspan="9" style="padding:0;background:var(--bg)">
+      <div style="padding:12px 16px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Pro-rata allocation</div>
+      ${allocTable(c.allocations, c.currency)}</div></td></tr>` : ""}`).join("");
+  return `<h1>Capital calls</h1>
+  <p class="page-note">A call is drafted, allocated pro-rata by commitment, approved by a second
+  pair of eyes, then funded — funding writes one posted contribution per investor.
+  Click a call number to see its allocation.</p>
+  <div class="toolbar">${toggleBtn("call", "+ New call")}<div class="spacer"></div>
+    <span class="muted">${db.calls.filter(c => c.state === "draft").length} awaiting approval</span></div>
+  ${session.forms.call ? `<form class="card" data-form="call" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Fund</label><select name="entity_id">${db.entities.map(e => `<option value="${e.id}">${esc(e.code)} — ${esc(e.legal_name)}</option>`).join("")}</select></div>
+      <div><label>Call number</label><input type="text" name="call_number" value="CC-${String(db.calls.length + 1).padStart(3, "0")}" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Notice date</label><input type="date" name="notice_date" value="${TODAY}" required></div>
+      <div><label>Due date</label><input type="date" name="due_date" value="2026-02-11" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Total amount</label><input type="number" name="total_amount" value="20000000" min="1" step="0.01" required></div>
+      <div><label>Purpose</label><select name="purpose">
+        <option value="investment">Investment</option>
+        <option value="management_fee">Management fee</option>
+        <option value="expense">Expense</option></select></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Create draft</button>
+  </form>` : ""}
+  ${tbl(`<th>Call #</th><th>Fund</th><th>Notice</th><th>Due</th><th class="num">Total</th><th>Purpose</th><th>Maker</th><th>State</th><th></th>`,
+        rows, 9, "No capital calls yet.")}`;
+}
+
+/* ===================== distributions ================================ */
+function pageDistributions() {
+  const rows = db.distributions.slice().reverse().map(d => `<tr>
+    <td class="mono"><a data-act="expand" data-id="dist-${d.id}">${esc(d.distribution_number)}</a></td>
+    <td class="mono">${esc(entityName(d.entity_id))}</td>
+    <td class="mono">${esc(d.notice_date)}</td><td class="mono">${esc(d.payment_date)}</td>
+    <td class="num">${cur(d.total_amount)}</td><td>${esc(d.purpose.replace(/_/g, " "))}</td>
+    <td>${d.recallable ? '<span class="badge warn">yes</span>' : '<span class="badge muted">no</span>'}</td>
+    <td>${badge(d.state)}</td>
+    <td class="row-actions">
+      ${d.state === "draft" ? actBtn("Approve", "dist-approve", d.id, "approve") : ""}
+      ${d.state === "approved" ? actBtn("Pay", "dist-pay", d.id, "post", "") : ""}
+    </td></tr>
+    ${session.forms["dist-" + d.id] ? `<tr><td colspan="9" style="padding:0;background:var(--bg)">
+      <div style="padding:12px 16px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Pro-rata payout</div>
+      ${allocTable(d.allocations, d.currency)}</div></td></tr>` : ""}`).join("");
+  return `<h1>Distributions</h1>
+  <p class="page-note">Recallable distributions add back to unfunded commitment; the flag is
+  carried through to the waterfall so returned capital is not double-counted.</p>
+  <div class="toolbar">${toggleBtn("dist", "+ New distribution")}<div class="spacer"></div>
+    <span class="muted">${cur(distributed())} paid to date</span></div>
+  ${session.forms.dist ? `<form class="card" data-form="dist" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Fund</label><select name="entity_id">${db.entities.map(e => `<option value="${e.id}">${esc(e.code)} — ${esc(e.legal_name)}</option>`).join("")}</select></div>
+      <div><label>Distribution number</label><input type="text" name="distribution_number" value="DIST-${String(db.distributions.length + 1).padStart(3, "0")}" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Notice date</label><input type="date" name="notice_date" value="${TODAY}" required></div>
+      <div><label>Payment date</label><input type="date" name="payment_date" value="2026-02-11" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Total amount</label><input type="number" name="total_amount" value="12000000" min="1" step="0.01" required></div>
+      <div><label>Purpose</label><select name="purpose">
+        <option value="profit">Profit</option>
+        <option value="return_of_capital">Return of capital</option>
+        <option value="recallable_return">Recallable return</option></select></div>
+    </div>
+    <div class="form-row check"><label><input type="checkbox" name="recallable"> Recallable — adds back to unfunded commitment</label></div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Create draft</button>
+  </form>` : ""}
+  ${tbl(`<th>Number</th><th>Fund</th><th>Notice</th><th>Payment</th><th class="num">Total</th><th>Purpose</th><th>Recallable</th><th>State</th><th></th>`,
+        rows, 9, "No distributions yet.")}`;
+}
+
+/* ===================== NAV ========================================== */
+function pageNav() {
+  const rows = db.navs.slice().sort((a, b) => a.as_of < b.as_of ? 1 : -1).map(n => `<tr>
+    <td class="mono">${esc(n.as_of)}</td><td class="num">${cur(n.gross_asset_value)}</td>
+    <td class="num">${cur(n.liabilities)}</td><td class="num">${cur(n.ending_nav)}</td>
+    <td class="mono">${esc(n.currency)}</td><td>${dash(n.source_reference)}</td>
+    <td class="mono muted">${esc(n.published_by)}</td></tr>`).join("");
+  return `<h1>NAV</h1>
+  <p class="page-note">Ending NAV is gross asset value less liabilities. It drives RVPI, TVPI and
+  the unrealised leg of the waterfall, so publishing is a
+  <span class="mono">post</span>-permission action and every snapshot is kept.</p>
+  <form class="card" data-form="nav" style="margin-bottom:16px">
+    <div class="form-row inline3">
+      <div><label>Fund</label><select name="entity_id">${db.entities.map(e => `<option value="${e.id}">${esc(e.code)}</option>`).join("")}</select></div>
+      <div><label>As of</label><input type="date" name="as_of" value="2026-03-31" required></div>
+      <div><label>Currency</label><input type="text" name="currency" value="USD" maxlength="3" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Gross asset value</label><input type="number" name="gross_asset_value" value="82000000" step="0.01" required></div>
+      <div><label>Liabilities</label><input type="number" name="liabilities" value="600000" step="0.01" required></div>
+    </div>
+    <div class="form-row"><label>Source reference</label><input type="text" name="source_reference" value="Q1-2026 valuation"></div>
+    <button class="btn" type="submit"${can("post") ? "" : " disabled title=\"requires 'post' permission\""}>Publish</button>
+  </form>
+  ${tbl(`<th>As of</th><th class="num">Gross AV</th><th class="num">Liabilities</th><th class="num">Ending NAV</th><th>Currency</th><th>Source</th><th>By</th>`,
+        rows, 7, "No NAV published yet.")}`;
+}
+
+/* ===================== fees ========================================= */
+function pageFees() {
+  const run = db.fee_runs.length ? db.fee_runs[db.fee_runs.length - 1] : null;
+  const schedules = db.fee_schedules.map(f => `<tr>
+    <td class="mono">${f.id}</td><td>${esc(f.name)}</td><td>${esc(f.basis.replace(/_/g, " "))}</td>
+    <td class="num">${f.annual_rate_bps}</td><td>${esc(f.periodicity)}</td>
+    <td class="mono">${esc(f.effective_from)}</td><td class="mono">v${f.version}</td>
+    <td>${badge(f.state)}</td>
+    <td class="row-actions">${f.state === "draft" ? actBtn("Approve", "fee-approve", f.id, "approve") : ""}</td></tr>`).join("");
+  return `<h1>Fees</h1>
+  <p class="page-note">A run snapshots the schedule version and hashes its inputs, so re-running the
+  same period reproduces the same accrual to the cent — or fails loudly if the inputs moved.</p>
+
+  <div class="toolbar">${toggleBtn("fee", "+ New schedule")}<div class="spacer"></div></div>
+  ${session.forms.fee ? `<form class="card" data-form="fee" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Name</label><input type="text" name="name" value="Management Fee 1.5% (post step-down)" required></div>
+      <div><label>Basis</label><select name="basis">
+        <option value="commitment">Commitment</option><option value="invested_capital">Invested capital</option>
+        <option value="nav">NAV</option><option value="flat">Flat</option></select></div>
+    </div>
+    <div class="form-row inline3">
+      <div><label>Annual rate (bps)</label><input type="number" name="annual_rate_bps" value="150" min="0" required></div>
+      <div><label>Periodicity</label><select name="periodicity">
+        <option value="quarterly">Quarterly</option><option value="monthly">Monthly</option>
+        <option value="annual">Annual</option></select></div>
+      <div><label>Effective from</label><input type="date" name="effective_from" value="2026-01-01" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Create draft</button>
+  </form>` : ""}
+
+  <h2>Schedules</h2>
+  ${tbl(`<th>ID</th><th>Name</th><th>Basis</th><th class="num">Rate (bps)</th><th>Periodicity</th><th>Effective</th><th>Version</th><th>State</th><th></th>`,
+        schedules, 9, "No fee schedules.")}
+
+  <h2>Run accrual</h2>
+  <form class="card" data-form="fee-run">
+    <div class="form-row inline3">
+      <div><label>Schedule</label><select name="schedule_id">
+        ${db.fee_schedules.filter(f => f.state === "approved").map(f => `<option value="${f.id}">${esc(f.name)} (v${f.version})</option>`).join("") || `<option value="">— no approved schedule —</option>`}
+      </select></div>
+      <div><label>Period start</label><input type="date" name="start" value="2025-10-01" required></div>
+      <div><label>Period end</label><input type="date" name="end" value="2025-12-31" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Run fees</button>
+  </form>
+
+  ${run ? `<h2>Run #${run.id} · ${esc(run.start)} → ${esc(run.end)}</h2>
+  <p class="page-note" style="margin-bottom:10px">Input hash <span class="mono">${esc(run.input_hash)}</span> ·
+    schedule v${run.schedule_version} · run by <span class="mono">${esc(run.run_by)}</span> at ${esc(run.run_at)}</p>
+  ${tbl(`<th>Investor</th><th class="num">Basis</th><th class="num">Rate (bps)</th><th class="num">Gross</th><th class="num">Offset</th><th class="num">Net</th>`,
+    run.lines.map(l => `<tr><td class="mono">${esc(investorCode(l.investor_id))}</td>
+      <td class="num">${cur(l.basis_amount)}</td><td class="num">${l.rate_bps}</td>
+      <td class="num">${cur2(l.gross)}</td><td class="num">${cur2(l.offset)}</td>
+      <td class="num">${cur2(l.net)}</td></tr>`).join("") +
+    `<tr class="total"><td>Total</td><td class="num">${cur(run.lines.reduce((a, l) => a + l.basis_amount, 0))}</td><td></td>
+      <td class="num">${cur2(run.lines.reduce((a, l) => a + l.gross, 0))}</td>
+      <td class="num">${cur2(run.lines.reduce((a, l) => a + l.offset, 0))}</td>
+      <td class="num">${cur2(run.lines.reduce((a, l) => a + l.net, 0))}</td></tr>`, 6, "")}` : ""}`;
+}
+</script>
+<script>
+"use strict";
+/* ===================== waterfall ==================================== */
+/* Faithful port of app/services/waterfall.py::_compute_tiers */
+function computeHurdle(invested, annualBps, years, compounding) {
+  const rate = annualBps / 10000;
+  if (compounding === "simple") return r2(invested * rate * years);
+  let v = invested;
+  const whole = Math.floor(years), frac = years - whole;
+  for (let i = 0; i < whole; i++) v = v * (1 + rate);
+  if (frac > 0) v = v * (1 + rate * frac);
+  return r2(v - invested);
+}
+function computeTiers(model, inp) {
+  let available = model.method === "american" ? inp.realised : inp.realised + inp.unrealised;
+  const invested = inp.contributions + inp.recallable;
+  const years = Math.max(0, (new Date(inp.as_of) - new Date(inp.start)) / 86400000) / 365;
+  const tiers = [];
+
+  const roc = Math.min(available, invested);
+  tiers.push({ name:"Return of capital", lp:r2(roc), gp:0,
+    formula:`min(available=${num(available, 2)}, invested=${num(invested, 2)})` });
+  available -= roc;
+
+  const hurdle = computeHurdle(invested, model.preferred_return_bps, years, model.hurdle_compounding);
+  const pref = Math.min(available, hurdle);
+  tiers.push({ name:"Preferred return", lp:r2(pref), gp:0,
+    formula:`hurdle=${num(hurdle, 2)} @ ${model.preferred_return_bps}bps over ${years.toFixed(4)}y` });
+  available -= pref;
+
+  const carryRate = model.carried_interest_bps / 10000;
+  const catchupRate = model.catchup_percentage_bps / 10000;
+  if (carryRate > 0 && catchupRate > 0 && available > 0) {
+    const targetGp = pref * carryRate / (1 - carryRate);
+    const catchup = Math.min(available, targetGp);
+    tiers.push({ name:"GP catch-up", lp:0, gp:r2(catchup),
+      formula:`catchup target_gp=${num(targetGp, 2)} at ${model.catchup_percentage_bps}bps` });
+    available -= catchup;
+  }
+  if (available > 0) {
+    const gpCarry = available * carryRate;
+    tiers.push({ name:"Carried interest", lp:r2(available - gpCarry), gp:r2(gpCarry),
+      formula:`residual=${num(available, 2)}; carry=${carryRate}` });
+  }
+  return { tiers, years, invested };
+}
+
+function pageWaterfall() {
+  const run = db.wf_runs.length ? db.wf_runs[db.wf_runs.length - 1] : null;
+  const models = db.wf_models.map(m => `<tr>
+    <td class="mono">${m.id}</td><td>${esc(m.name)}</td><td>${esc(m.method)}</td>
+    <td class="mono">${m.preferred_return_bps / 100}% / ${m.catchup_percentage_bps / 100}% / ${m.carried_interest_bps / 100}%</td>
+    <td>${esc(m.hurdle_compounding)}</td><td class="mono">v${m.version}</td><td>${badge(m.state)}</td>
+    <td class="row-actions">${m.state === "draft" ? actBtn("Approve", "wf-approve-model", m.id, "approve") : ""}</td></tr>`).join("");
+  return `<h1>Waterfall &amp; carry</h1>
+  <p class="page-note">Four tiers in order: return of capital, preferred return, GP catch-up,
+  then the carry split. Change the distributable amount below and re-run to watch the tiers
+  fill — on the seeded fund, capital is not yet fully returned, so carry is zero until
+  proceeds clear ${cur(contributed())}.</p>
+
+  <div class="toolbar">${toggleBtn("wfm", "+ New model")}<div class="spacer"></div></div>
+  ${session.forms.wfm ? `<form class="card" data-form="wfm" style="margin-bottom:16px">
+    <div class="form-row inline">
+      <div><label>Name</label><input type="text" name="name" value="8/20 American" required></div>
+      <div><label>Method</label><select name="method">
+        <option value="european">European (whole-fund)</option>
+        <option value="american">American (deal-by-deal)</option>
+        <option value="hybrid">Hybrid</option></select></div>
+    </div>
+    <div class="form-row inline3">
+      <div><label>Preferred return (bps)</label><input type="number" name="preferred_return_bps" value="800" required></div>
+      <div><label>Catch-up (bps)</label><input type="number" name="catchup_percentage_bps" value="10000" required></div>
+      <div><label>Carried interest (bps)</label><input type="number" name="carried_interest_bps" value="2000" required></div>
+    </div>
+    <div class="form-row inline">
+      <div><label>Hurdle compounding</label><select name="hurdle_compounding">
+        <option value="annual">Annual</option><option value="simple">Simple</option></select></div>
+      <div><label>Effective from</label><input type="date" name="effective_from" value="2026-01-01" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Create draft</button>
+  </form>` : ""}
+
+  <h2>Models</h2>
+  ${tbl(`<th>ID</th><th>Name</th><th>Method</th><th>Pref / catch-up / carry</th><th>Compounding</th><th>Version</th><th>State</th><th></th>`,
+        models, 8, "No waterfall models.")}
+
+  <h2>Run calculation</h2>
+  <form class="card" data-form="wf-run">
+    <div class="form-row inline">
+      <div><label>Model</label><select name="model_id">
+        ${db.wf_models.filter(m => m.state === "approved").map(m => `<option value="${m.id}">${esc(m.name)} (v${m.version})</option>`).join("") || `<option value="">— no approved model —</option>`}
+      </select></div>
+      <div><label>Scenario label</label><input type="text" name="scenario_label" placeholder="e.g. Q1-2026 exit case"></div>
+    </div>
+    <div class="form-row inline3">
+      <div><label>Realised proceeds</label><input type="number" name="realised" value="15000000" step="0.01" required></div>
+      <div><label>Unrealised value</label><input type="number" name="unrealised" value="74500000" step="0.01" required></div>
+      <div><label>As of</label><input type="date" name="as_of" value="2025-12-31" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Run</button>
+  </form>
+
+  ${run ? `<h2>Run #${run.id}${run.scenario_label ? " · " + esc(run.scenario_label) : ""}</h2>
+  <div class="grid" style="margin-bottom:12px">
+    ${kpi("LP total", cur(run.lp_total))}
+    ${kpi("GP total", cur(run.gp_total))}
+    ${kpi("GP share", pct((run.lp_total + run.gp_total) ? run.gp_total / (run.lp_total + run.gp_total) : 0))}
+    ${kpi("Distributable", cur(run.available))}
+    ${kpi("State", run.state, run.approved_by ? "by " + run.approved_by : "")}
+  </div>
+  <p class="page-note" style="margin-bottom:10px">Input hash <span class="mono">${esc(run.input_hash)}</span> ·
+    model v${run.model_version} · ${run.years.toFixed(2)} years since first close ·
+    run by <span class="mono">${esc(run.run_by)}</span></p>
+  ${tbl(`<th>#</th><th>Tier</th><th class="num">LP</th><th class="num">GP</th><th>Formula</th>`,
+    run.tiers.map((t, i) => `<tr><td class="mono">${i + 1}</td><td>${esc(t.name)}</td>
+      <td class="num">${cur2(t.lp)}</td><td class="num">${cur2(t.gp)}</td>
+      <td class="mono muted" style="font-size:11px">${esc(t.formula)}</td></tr>`).join("") +
+    `<tr class="total"><td></td><td>Total</td><td class="num">${cur2(run.lp_total)}</td>
+      <td class="num">${cur2(run.gp_total)}</td><td></td></tr>`, 5, "")}
+  <div class="toolbar" style="margin-top:12px">
+    ${run.state === "draft" ? actBtn("Approve run", "wf-approve-run", run.id, "approve", "") :
+      `<span class="muted">Run approved by <span class="mono">${esc(run.approved_by)}</span> — the snapshot is now immutable.</span>`}
+  </div>` : ""}`;
+}
+
+/* ===================== periods ====================================== */
+function pagePeriods() {
+  const sel = session.forms.periodId || (db.periods.find(p => p.status === "open") || db.periods[0]).id;
+  const steps = db.steps.filter(s => s.period_id === sel).sort((a, b) => a.order - b.order);
+  const rows = db.periods.map(p => `<tr${p.id === sel ? ' style="background:var(--panel-2)"' : ""}>
+    <td><input type="radio" name="periodsel" data-act="period-select" data-id="${p.id}"${p.id === sel ? " checked" : ""} style="width:auto"></td>
+    <td class="mono">${p.id}</td><td>${esc(p.period_type)}</td>
+    <td class="mono">${esc(p.start_date)}</td><td class="mono">${esc(p.end_date)}</td>
+    <td>${badge(p.status)}</td><td class="muted">${dash(p.reopen_reason)}</td>
+    <td class="row-actions">
+      ${p.status === "open" || p.status === "reopened" ? actBtn("Soft close", "period-soft", p.id, "approve") : ""}
+      ${p.status === "soft_close" ? actBtn("Close", "period-close", p.id, "post", "") : ""}
+      ${p.status === "closed" ? actBtn("Reopen", "period-reopen", p.id, "admin") : ""}
+    </td></tr>
+    ${session.forms["reopen-" + p.id] ? `<tr><td colspan="8" style="padding:0;background:var(--bg)">
+      <form data-form="reopen" style="display:flex;gap:10px;align-items:flex-end;padding:12px 16px">
+        <input type="hidden" name="id" value="${p.id}">
+        <div style="flex:1"><label>Reason — reopening is logged as a privileged action</label>
+          <input type="text" name="reason" value="Late custodian adjustment" required></div>
+        <button class="btn danger sm" type="submit">Reopen period</button>
+        <button class="btn secondary sm" type="button" data-act="toggle" data-id="reopen-${p.id}">Cancel</button>
+      </form></td></tr>` : ""}`).join("");
+  const stepRows = steps.map(s => {
+    const dep = s.depends_on_order ? steps.find(x => x.order === s.depends_on_order) : null;
+    const blocked = dep && dep.status !== "signed_off";
+    return `<tr><td class="mono">${s.order}</td><td>${esc(s.name)}</td>
+      <td class="mono">${esc(s.due_date)}</td>
+      <td class="muted">${dep ? esc(`#${dep.order} ${dep.name}`) : "—"}</td>
+      <td>${badge(blocked && s.status === "pending" ? "blocked" : s.status)}</td>
+      <td class="mono muted">${s.signed_off_by ? esc(s.signed_off_by + " · " + s.signed_off_at) : "—"}</td>
+      <td class="row-actions">${s.status === "pending"
+        ? (blocked
+            ? `<button class="btn secondary sm" disabled title="depends on step #${dep.order} — ${esc(dep.name)}">Sign off</button>`
+            : actBtn("Sign off", "step-signoff", s.id, "approve"))
+        : ""}</td></tr>`;
+  }).join("");
+  return `<h1>Accounting periods</h1>
+  <p class="page-note">Soft close blocks new postings but allows adjustments; hard close locks the
+  period entirely and needs every close step signed off first. Reopening is an
+  <span class="mono">admin</span> action and always records a reason.</p>
+  <div class="toolbar">${toggleBtn("period", "+ Ensure period")}<div class="spacer"></div></div>
+  ${session.forms.period ? `<form class="card" data-form="period" style="margin-bottom:16px">
+    <div class="form-row inline3">
+      <div><label>Type</label><select name="period_type">
+        <option value="quarterly">Quarterly</option><option value="monthly">Monthly</option>
+        <option value="annual">Annual</option><option value="daily">Daily</option></select></div>
+      <div><label>Start</label><input type="date" name="start_date" value="2026-01-01" required></div>
+      <div><label>End</label><input type="date" name="end_date" value="2026-03-31" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Ensure period</button>
+  </form>` : ""}
+  ${tbl(`<th></th><th>ID</th><th>Type</th><th>Start</th><th>End</th><th>Status</th><th>Reopen reason</th><th></th>`,
+        rows, 8, "No periods.")}
+
+  <h2>Close checklist — period #${sel}</h2>
+  ${tbl(`<th>#</th><th>Step</th><th>Due</th><th>Depends on</th><th>Status</th><th>Signed off</th><th></th>`,
+        stepRows, 7, "No close steps for this period.")}`;
+}
+
+/* ===================== reconciliation =============================== */
+function pageRecon() {
+  const last = db.recon_runs.length ? db.recon_runs[db.recon_runs.length - 1] : null;
+  const excRows = db.exceptions.map(e => `<tr>
+    <td class="mono">${e.id}</td><td class="mono">${e.batch_id}</td><td class="num">${e.row_number}</td>
+    <td><span class="badge err">${esc(e.code)}</span></td><td>${esc(e.message)}</td>
+    <td class="mono">${dash(e.owner)}</td><td>${badge(e.status)}</td><td class="muted">${dash(e.note)}</td>
+    <td class="row-actions">
+      ${e.status === "open" ? actBtn("Assign to me", "exc-assign", e.id, "edit") : ""}
+      ${e.status === "assigned" ? actBtn("Resolve", "exc-resolve", e.id, "edit") : ""}
+    </td></tr>
+    ${session.forms["resolve-" + e.id] ? `<tr><td colspan="9" style="padding:0;background:var(--bg)">
+      <form data-form="resolve" style="display:flex;gap:10px;align-items:flex-end;padding:12px 16px">
+        <input type="hidden" name="id" value="${e.id}">
+        <div style="flex:1"><label>Resolution note</label>
+          <input type="text" name="note" value="Investor code corrected to PEN-001 and the row re-imported." required></div>
+        <button class="btn sm" type="submit">Resolve</button>
+        <button class="btn secondary sm" type="button" data-act="toggle" data-id="resolve-${e.id}">Cancel</button>
+      </form></td></tr>` : ""}`).join("");
+  return `<h1>Reconciliation</h1>
+  <p class="page-note">Matches posted ledger activity against the custodian feed for a date range.
+  Anything unmatched becomes a break with an owner; breaks and open exceptions both block a hard close.</p>
+  <form class="card" data-form="recon" style="margin-bottom:16px">
+    <div class="form-row inline3">
+      <div><label>Fund</label><select name="entity_id">${db.entities.map(e => `<option value="${e.id}">${esc(e.code)}</option>`).join("")}</select></div>
+      <div><label>From</label><input type="date" name="from" value="2025-10-01" required></div>
+      <div><label>To</label><input type="date" name="to" value="2025-12-31" required></div>
+    </div>
+    <button class="btn" type="submit"${can("create") ? "" : " disabled title=\"requires 'create' permission\""}>Reconcile</button>
+  </form>
+  ${last ? `<h2>Run #${last.id} · ${esc(last.from)} → ${esc(last.to)}</h2>
+  <div class="grid">
+    ${kpi("Ledger records", last.ledger)}
+    ${kpi("Feed records", last.feed)}
+    ${kpi("Matched", last.matched)}
+    ${kpi("Breaks", last.breaks, last.breaks ? "need an owner" : "clean", last.breaks ? "flag" : "zero")}
+  </div>` : ""}
+
+  <h2>Exception queue</h2>
+  ${tbl(`<th>ID</th><th>Batch</th><th class="num">Row</th><th>Code</th><th>Message</th><th>Owner</th><th>Status</th><th>Note</th><th></th>`,
+        excRows, 9, "Exception queue is clear.")}`;
+}
+</script>
+<script>
+"use strict";
+/* ===================== reports ====================================== */
+const EXPORTS = [
+  ["transactions.csv", "Every transaction with state, maker and approver"],
+  ["trial-balance.csv", "Account-level debits, credits and net"],
+  ["capital-accounts.csv", "Per-investor contributed, distributed, NAV and P&L"],
+  ["journal-entries.csv", "Double-entry lines behind the posted transactions"],
+];
+function pageReports() {
+  const kind = session.forms.report || "trial_balance";
+  let body = "";
+  if (kind === "trial_balance") {
+    const rows = trialBalance();
+    body = tbl(`<th>Account</th><th>Name</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Net</th>`,
+      rows.map(r => `<tr><td class="mono">${esc(r.account)}</td><td>${esc(r.name)}</td>
+        <td class="num">${cur(r.debit)}</td><td class="num">${cur(r.credit)}</td>
+        <td class="num">${cur(r.net)}</td></tr>`).join("") +
+      `<tr class="total"><td colspan="2">Total</td>
+        <td class="num">${cur(rows.reduce((a, r) => a + r.debit, 0))}</td>
+        <td class="num">${cur(rows.reduce((a, r) => a + r.credit, 0))}</td>
+        <td class="num">${cur(rows.reduce((a, r) => a + r.net, 0))}</td></tr>`, 5, "");
+  } else if (kind === "capital_account") {
+    body = tbl(`<th>Investor</th><th class="num">Commitment</th><th class="num">Contributed</th><th class="num">Distributed</th><th class="num">NAV</th><th class="num">Net P&amp;L</th><th class="num">TVPI</th>`,
+      db.investors.map(i => {
+        const a = accountFor(i.id), c = db.commitments.find(x => x.investor_id === i.id);
+        return `<tr><td class="mono"><a href="#/investors/${i.id}">${esc(i.code)}</a></td>
+          <td class="num">${cur(c.commitment_amount)}</td><td class="num">${cur(a.contributed)}</td>
+          <td class="num">${cur(a.distributed)}</td><td class="num">${cur(a.nav)}</td>
+          <td class="num">${cur(a.pnl)}</td>
+          <td class="num">${ratio(a.contributed ? (a.distributed + a.nav) / a.contributed : null)}</td></tr>`;
+      }).join("") +
+      `<tr class="total"><td>Total</td><td class="num">${cur(committed())}</td>
+        <td class="num">${cur(contributed())}</td><td class="num">${cur(distributed())}</td>
+        <td class="num">${cur(endingNav())}</td>
+        <td class="num">${cur(distributed() + endingNav() - contributed())}</td>
+        <td class="num">${ratio(performance().tvpi)}</td></tr>`, 7, "");
+  } else {
+    const flows = posted().slice().sort((a, b) => a.transaction_date < b.transaction_date ? -1 : 1);
+    let running = 0;
+    body = tbl(`<th>Date</th><th>Type</th><th>Reference</th><th>Investor</th><th class="num">Amount</th><th class="num">Cumulative net</th>`,
+      flows.map(t => {
+        running += t.transaction_type === "contribution" ? -t.amount : t.amount;
+        return `<tr><td class="mono">${esc(t.transaction_date)}</td><td>${esc(t.transaction_type)}</td>
+          <td class="mono">${esc(t.source_reference)}</td><td>${t.investor_id ? esc(investorCode(t.investor_id)) : "—"}</td>
+          <td class="num">${cur(t.transaction_type === "contribution" ? -t.amount : t.amount)}</td>
+          <td class="num">${cur(running)}</td></tr>`;
+      }).join(""), 6, "Nothing posted yet.");
+  }
+  return `<h1>Reports</h1>
+  <p class="page-note">Reports run against posted transactions only, and reproduce against the
+  configuration effective on the report date.</p>
+  <div class="toolbar">
+    <label style="margin:0">Report</label>
+    <select data-act="report-pick" style="width:280px">
+      <option value="trial_balance"${kind === "trial_balance" ? " selected" : ""}>Trial balance</option>
+      <option value="capital_account"${kind === "capital_account" ? " selected" : ""}>Capital account statement</option>
+      <option value="contrib_distrib"${kind === "contrib_distrib" ? " selected" : ""}>Contributions &amp; distributions</option>
+    </select>
+    <div class="spacer"></div><span class="muted">${posted().length} posted transactions</span>
+  </div>
+  ${body}
+
+  <h2>Bulk exports</h2>
+  <div class="grid wide">
+    ${EXPORTS.map(([f, d]) => `<div class="card">
+      <div class="mono" style="color:var(--accent);font-size:13px">${esc(f)}</div>
+      <div class="muted" style="font-size:12px;margin:6px 0 10px">${esc(d)}</div>
+      <button class="btn secondary sm" data-act="export" data-id="${esc(f)}"${can("export") ? "" : " disabled title=\"requires 'export' permission\""}>Export</button>
+    </div>`).join("")}
+  </div>`;
+}
+
+/* ===================== operations =================================== */
+function pageOperations() {
+  const byStatus = {};
+  db.jobs.forEach(j => byStatus[j.status] = (byStatus[j.status] || 0) + 1);
+  const maxJ = Math.max(1, ...Object.values(byStatus));
+  const excByCode = {};
+  db.exceptions.forEach(e => excByCode[e.code] = (excByCode[e.code] || 0) + 1);
+  const pend = [
+    ["Transactions", db.transactions.filter(t => t.state === "validated").length, "/transactions"],
+    ["Capital calls", db.calls.filter(c => c.state === "draft").length, "/capital-calls"],
+    ["Distributions", db.distributions.filter(d => d.state === "draft").length, "/distributions"],
+    ["Fee schedules", db.fee_schedules.filter(f => f.state === "draft").length, "/fees"],
+    ["Waterfall models", db.wf_models.filter(m => m.state === "draft").length, "/waterfall"],
+    ["Waterfall runs", db.wf_runs.filter(r => r.state === "draft").length, "/waterfall"],
+  ];
+  const jobRows = db.jobs.slice().reverse().map(j => `<tr>
+    <td class="mono">${j.id}</td><td class="mono">${esc(j.job_type)}</td><td>${esc(j.trigger)}</td>
+    <td>${badge(j.status)}</td><td class="mono muted">${dash(j.started_at)}</td>
+    <td class="mono muted">${dash(j.finished_at)}</td>
+    <td class="muted" style="font-size:12px">${dash(j.error)}</td>
+    <td class="row-actions">${j.status === "failed" ? actBtn("Retry", "job-retry", j.id, "create") : ""}</td></tr>`).join("");
+  const statusClass = s => s === "succeeded" ? "ok" : s === "failed" ? "err" : "warn";
+  return `<h1>Operations</h1>
+  <p class="page-note">Everything the platform runs on a schedule or on demand, plus whatever is
+  sitting in a queue waiting for a person.</p>
+
+  <h2>Jobs by status</h2>
+  <div class="card"><div class="bars">
+    ${Object.entries(byStatus).map(([s, n]) => `<div class="bar">
+      <div>${badge(s)}</div>
+      <div class="track"><div class="fill ${statusClass(s)}" style="width:${(n / maxJ * 100).toFixed(1)}%"></div></div>
+      <div class="v">${n}</div></div>`).join("") || '<div class="muted">No jobs recorded.</div>'}
+  </div></div>
+
+  <h2>Pending approvals</h2>
+  <div class="card"><div class="bars">
+    ${pend.map(([label, n, to]) => `<div class="bar">
+      <div><a href="#${to}">${esc(label)}</a></div>
+      <div class="track"><div class="fill ${n ? "warn" : "ok"}" style="width:${n ? Math.min(100, n * 20) : 2}%"></div></div>
+      <div class="v">${n}</div></div>`).join("")}
+  </div></div>
+
+  <h2>Exceptions by code</h2>
+  <div class="card">${Object.keys(excByCode).length
+    ? `<div class="bars">${Object.entries(excByCode).map(([c, n]) => `<div class="bar">
+        <div class="mono" style="font-size:11px">${esc(c)}</div>
+        <div class="track"><div class="fill err" style="width:${Math.min(100, n * 25)}%"></div></div>
+        <div class="v">${n}</div></div>`).join("")}</div>`
+    : '<div class="muted">No exceptions raised.</div>'}</div>
+
+  <h2>Recent jobs</h2>
+  ${tbl(`<th>ID</th><th>Type</th><th>Trigger</th><th>Status</th><th>Started</th><th>Finished</th><th>Error</th><th></th>`,
+        jobRows, 8, "No jobs yet.")}`;
+}
+
+/* ===================== audit ======================================== */
+function pageAudit() {
+  const q = (session.forms.auditQ || "").toLowerCase();
+  const events = db.audit.filter(e => !q ||
+    e.action.toLowerCase().includes(q) || e.actor.toLowerCase().includes(q) || e.object.toLowerCase().includes(q));
+  const rows = events.slice(0, 120).map(e => `<tr>
+    <td class="mono muted">${esc(e.at)}</td><td class="mono">${esc(e.actor)}</td>
+    <td class="mono">${esc(e.action)}</td><td class="mono muted">${esc(e.object)}</td>
+    <td>${e.privileged ? '<span class="badge warn">privileged</span>' : '<span class="badge muted">no</span>'}</td></tr>`).join("");
+  const lin = db.lineage.slice(0, 40).map(l => `<tr>
+    <td>${esc(l.relation)}</td><td class="mono">${esc(l.from)}</td><td class="mono">${esc(l.to)}</td>
+    <td class="num">${l.depth}</td></tr>`).join("");
+  return `<h1>Audit &amp; lineage</h1>
+  <p class="page-note">The audit log is append-only — no role can edit or delete an entry. Lineage
+  edges connect import batches to transactions to journal entries to calculations, so any figure
+  in a report can be walked back to the row it came from.</p>
+  <div class="toolbar">
+    <input type="text" data-act="audit-q" value="${esc(session.forms.auditQ || "")}" placeholder="Filter by actor, action or object…" style="max-width:340px">
+    <span class="muted">${events.length} of ${db.audit.length} events</span>
+    <div class="spacer"></div>
+  </div>
+  ${tbl(`<th>When</th><th>Actor</th><th>Action</th><th>Object</th><th>Privileged</th>`, rows, 5,
+        q ? "No events match that filter." : "No events yet.")}
+
+  <h2>Lineage edges</h2>
+  ${tbl(`<th>Relation</th><th>From</th><th>To</th><th class="num">Depth</th>`, lin, 4,
+        "No lineage recorded yet — fund a call or run a calculation to create edges.")}`;
+}
+
+/* ===================== admin ======================================== */
+const ALL_ROLES = Object.keys(ROLE_PERMISSIONS);
+function pageAdmin() {
+  const rows = db.users.map(u => `<tr>
+    <td class="mono">${u.id}</td><td class="mono">${esc(u.username)}</td><td>${esc(u.display_name)}</td>
+    <td class="muted">${esc(u.email)}</td>
+    <td>${u.roles.map(r => `<span class="chip">${esc(r)}</span>`).join(" ")}</td>
+    <td>${u.mfa ? '<span class="badge ok">on</span>' : '<span class="badge warn">off</span>'}</td>
+    <td>${badge(u.active ? "active" : "cancelled")}</td>
+    <td class="row-actions">${u.active && u.username !== session.user.username
+      ? actBtn("Deactivate", "user-deactivate", u.id, "admin", "danger")
+      : (u.username === session.user.username ? '<span class="muted" style="font-size:12px">you</span>' : "")}</td></tr>`).join("");
+  const perms = ["read","create","edit","approve","post","export","admin"];
+  return `<h1>User administration</h1>
+  <p class="page-note">Roles map to fine-grained permissions. Sign out and back in as a different
+  user to see the same screens with different controls enabled — that is the RBAC layer, not a
+  cosmetic one.</p>
+  <div class="toolbar">${toggleBtn("user", "+ New user", "admin")}<div class="spacer"></div></div>
+  ${session.forms.user ? `<form class="card" data-form="user" style="margin-bottom:16px">
+    <div class="form-row inline3">
+      <div><label>Username</label><input type="text" name="username" required placeholder="dana"></div>
+      <div><label>Display name</label><input type="text" name="display_name" required placeholder="Dana"></div>
+      <div><label>Email</label><input type="email" name="email" required placeholder="dana@example.com"></div>
+    </div>
+    <div class="form-row"><label>Roles</label>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">${ALL_ROLES.map(r =>
+        `<label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--text);margin:0">
+          <input type="checkbox" name="roles" value="${r}" style="width:auto"> ${esc(r)}</label>`).join("")}</div>
+    </div>
+    <div class="form-row check"><label><input type="checkbox" name="mfa" checked> MFA enrolled</label></div>
+    <button class="btn" type="submit"${can("admin") ? "" : " disabled title=\"requires 'admin' permission\""}>Create user</button>
+  </form>` : ""}
+  ${tbl(`<th>ID</th><th>Username</th><th>Name</th><th>Email</th><th>Roles</th><th>MFA</th><th>Status</th><th></th>`,
+        rows, 8, "No users.")}
+
+  <h2>Role → permission matrix</h2>
+  ${tbl(`<th>Role</th>${perms.map(p => `<th class="num">${p}</th>`).join("")}`,
+    ALL_ROLES.map(r => `<tr><td class="mono">${esc(r)}</td>${perms.map(p =>
+      `<td class="num">${ROLE_PERMISSIONS[r].includes(p) ? '<span style="color:var(--ok)">✓</span>' : '<span class="muted">·</span>'}</td>`).join("")}</tr>`).join(""), 8, "")}`;
+}
+</script>
+<script>
+"use strict";
+/* ===================== hashing (services snapshot hashes) =========== */
+function inputHash(obj) {
+  const s = JSON.stringify(obj);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  let h2 = 52711;
+  for (let i = s.length - 1; i >= 0; i--) h2 = ((h2 * 33) ^ s.charCodeAt(i)) >>> 0;
+  return (h.toString(16).padStart(8, "0") + h2.toString(16).padStart(8, "0")).slice(0, 16);
+}
+const link = (rel, from, to, depth) => db.lineage.unshift({ relation:rel, from, to, depth });
+const log = (action, object, privileged) => audit(db, session.user.username, action, object, privileged);
+
+/* ===================== actions ====================================== */
+const ACTIONS = {
+  signout() { session.user = null; session.banner = null; session.forms = {}; location.hash = "#/"; },
+  reset() { resetDemo(); },
+  pick(id) {
+    const el = document.getElementById("loginUser");
+    if (el) { el.value = id; el.focus(); }
+    signIn(id);
+  },
+  toggle(key) { session.forms[key] = !session.forms[key]; },
+  expand(key) { session.forms[key] = !session.forms[key]; },
+
+  "tx-approve"(id) {
+    requirePerm("approve");
+    const t = db.transactions.find(x => x.id === +id);
+    requireNotMaker(t.maker);
+    t.state = "approved"; t.approver = session.user.username;
+    log("transaction.approve", `transaction:${t.id}`, false);
+    toast(`Transaction #${t.id} approved.`);
+  },
+  "tx-post"(id) {
+    requirePerm("post");
+    const t = db.transactions.find(x => x.id === +id);
+    const p = db.periods.find(x => t.transaction_date >= x.start_date && t.transaction_date <= x.end_date && x.period_type !== "annual");
+    if (p && (p.status === "closed" || p.status === "soft_close"))
+      throw new WorkflowError(`409 · period ${p.start_date}…${p.end_date} is ${p.status} — no new postings`);
+    t.state = "posted";
+    db.journal.push({ id:db.journal.length + 1, transaction_id:t.id, amount:t.amount });
+    if (t.batch_id) link("import→transaction", `batch:${t.batch_id}`, `transaction:${t.id}`, 1);
+    link("transaction→journal", `transaction:${t.id}`, `journal:${db.journal.length}`, 2);
+    log("transaction.post", `transaction:${t.id}`, false);
+    toast(`Transaction #${t.id} posted to the ledger.`);
+  },
+
+  "call-approve"(id) {
+    requirePerm("approve");
+    const c = db.calls.find(x => x.id === +id);
+    requireNotMaker(c.maker);
+    c.state = "approved"; c.approver = session.user.username;
+    log("capital_call.approve", `capital_call:${c.id}`, false);
+    toast(`${c.call_number} approved — ready to fund.`);
+  },
+  "call-fund"(id) {
+    requirePerm("post");
+    const c = db.calls.find(x => x.id === +id);
+    c.state = "funded";
+    c.allocations.forEach(a => {
+      const tx = addTx(db, { date:c.due_date, type:"contribution", ref:c.call_number, amount:a.amount,
+        state:"posted", maker:c.maker, approver:session.user.username, investor_id:a.investor_id,
+        memo:`Capital call ${c.call_number} funding` });
+      link("capital_call→transaction", `capital_call:${c.id}`, `transaction:${tx.id}`, 1);
+    });
+    log("capital_call.fund", `capital_call:${c.id}`, false);
+    toast(`${c.call_number} funded — ${c.allocations.length} contributions posted.`);
+  },
+
+  "dist-approve"(id) {
+    requirePerm("approve");
+    const d = db.distributions.find(x => x.id === +id);
+    requireNotMaker(d.maker);
+    d.state = "approved"; d.approver = session.user.username;
+    log("distribution.approve", `distribution:${d.id}`, false);
+    toast(`${d.distribution_number} approved — ready to pay.`);
+  },
+  "dist-pay"(id) {
+    requirePerm("post");
+    const d = db.distributions.find(x => x.id === +id);
+    d.state = "paid";
+    d.allocations.forEach(a => {
+      const tx = addTx(db, { date:d.payment_date, type:"distribution", ref:d.distribution_number,
+        amount:a.amount, state:"posted", maker:d.maker, approver:session.user.username,
+        investor_id:a.investor_id, memo:`Distribution ${d.distribution_number} payout` });
+      link("distribution→transaction", `distribution:${d.id}`, `transaction:${tx.id}`, 1);
+    });
+    log("distribution.pay", `distribution:${d.id}`, false);
+    toast(`${d.distribution_number} paid — ${d.allocations.length} payouts posted.`);
+  },
+
+  "fee-approve"(id) {
+    requirePerm("approve");
+    const f = db.fee_schedules.find(x => x.id === +id);
+    requireNotMaker(f.created_by);
+    f.state = "approved"; f.approved_by = session.user.username;
+    log("fee_schedule.approve", `fee_schedule:${f.id}`, false);
+    toast(`Fee schedule "${f.name}" approved.`);
+  },
+  "wf-approve-model"(id) {
+    requirePerm("approve");
+    const m = db.wf_models.find(x => x.id === +id);
+    requireNotMaker(m.created_by);
+    m.state = "approved"; m.approved_by = session.user.username;
+    log("waterfall_model.approve", `waterfall_model:${m.id}`, false);
+    toast(`Waterfall model "${m.name}" approved.`);
+  },
+  "wf-approve-run"(id) {
+    requirePerm("approve");
+    const r = db.wf_runs.find(x => x.id === +id);
+    requireNotMaker(r.run_by);
+    r.state = "approved"; r.approved_by = session.user.username;
+    log("waterfall_run.approve", `waterfall_run:${r.id}`, false);
+    toast(`Run #${r.id} approved — the snapshot is now immutable.`);
+  },
+
+  "period-select"(id) { session.forms.periodId = +id; },
+  "period-soft"(id) {
+    requirePerm("approve");
+    const p = db.periods.find(x => x.id === +id);
+    p.status = "soft_close";
+    log("period.soft_close", `period:${p.id}`, false);
+    toast(`Period ${p.start_date}…${p.end_date} soft-closed — adjustments only.`);
+  },
+  "period-close"(id) {
+    requirePerm("post");
+    const p = db.periods.find(x => x.id === +id);
+    const open = db.steps.filter(s => s.period_id === p.id && s.status !== "signed_off");
+    if (open.length) throw new WorkflowError(`409 · ${open.length} close step(s) not signed off: ${open.map(s => s.name).join(", ")}`);
+    if (openExceptions()) throw new WorkflowError(`409 · ${openExceptions()} open exception(s) must be resolved before hard close`);
+    p.status = "closed";
+    log("period.close", `period:${p.id}`, true);
+    toast(`Period ${p.start_date}…${p.end_date} hard-closed.`);
+  },
+  "period-reopen"(id) {
+    requirePerm("admin");
+    session.forms["reopen-" + id] = true;
+  },
+  "step-signoff"(id) {
+    requirePerm("approve");
+    const s = db.steps.find(x => x.id === +id);
+    const dep = s.depends_on_order ? db.steps.find(x => x.period_id === s.period_id && x.order === s.depends_on_order) : null;
+    if (dep && dep.status !== "signed_off")
+      throw new WorkflowError(`409 · step "${s.name}" depends on "${dep.name}", which is not signed off`);
+    s.status = "signed_off"; s.signed_off_by = session.user.username; s.signed_off_at = nowStamp();
+    log("close_step.sign_off", `close_step:${s.id}`, false);
+    toast(`"${s.name}" signed off.`);
+  },
+
+  "exc-assign"(id) {
+    requirePerm("edit");
+    const e = db.exceptions.find(x => x.id === +id);
+    e.owner = session.user.username; e.status = "assigned";
+    log("exception.assign", `exception:${e.id}`, false);
+    toast(`Exception #${e.id} assigned to ${e.owner}.`);
+  },
+  "exc-resolve"(id) {
+    requirePerm("edit");
+    session.forms["resolve-" + id] = true;
+  },
+  "job-retry"(id) {
+    requirePerm("create");
+    const j = db.jobs.find(x => x.id === +id);
+    j.status = "succeeded"; j.error = null;
+    j.started_at = nowStamp(); j.finished_at = nowStamp();
+    log("job.retry", `job:${j.id}`, false);
+    toast(`Job #${j.id} (${j.job_type}) retried and succeeded.`);
+  },
+  "user-deactivate"(id) {
+    requirePerm("admin");
+    const u = db.users.find(x => x.id === +id);
+    u.active = false;
+    log("user.deactivate", `user:${u.id}`, true);
+    toast(`${u.username} deactivated — their X-User-Id now returns 401.`, "info");
+  },
+  export(name) {
+    requirePerm("export");
+    db.jobs.push({ id:++db.seq.job, job_type:"export_" + name.replace(/\W+/g, "_"), trigger:"manual",
+      status:"succeeded", started_at:nowStamp(), finished_at:nowStamp(), error:null });
+    log("export.run", `export:${name}`, false);
+    toast(`${name} queued — in the running app this streams from /exports.`, "info");
+  },
+};
+
+/* ===================== form handlers ================================ */
+function signIn(username) {
+  const u = db.users.find(x => x.username === username && x.active);
+  if (!u) { session.banner = { kind:"err", text:"401 · unknown or inactive user" }; render(); return; }
+  session.user = { username:u.username, roles:u.roles.slice() };
+  session.banner = null;
+  audit(db, u.username, "auth.sign_in", `user:${u.id}`, false);
+  location.hash = "#/";
+  render();
+}
+
+const FORMS = {
+  login(f) { signIn(String(f.username || "").trim()); return "handled"; },
+
+  fund(f) {
+    requirePerm("create");
+    if (db.entities.some(e => e.code === f.code)) throw new WorkflowError(`409 · entity code ${f.code} already exists`);
+    const id = Math.max(0, ...db.entities.map(e => e.id)) + 1;
+    db.entities.push({ id, code:f.code.toUpperCase(), legal_name:f.legal_name, short_name:f.short_name,
+      entity_type:f.entity_type, jurisdiction:f.jurisdiction.toUpperCase(), vintage_year:+f.vintage_year,
+      strategy:f.strategy || null, base_currency:f.base_currency.toUpperCase(),
+      reporting_currency:f.base_currency.toUpperCase(), status:"active", version:1,
+      effective_from:TODAY, effective_to:null });
+    session.forms.fund = false;
+    log("entity.create", `entity:${id}`, false);
+    toast(`${f.code.toUpperCase()} created as v1, effective ${TODAY}.`);
+  },
+
+  inv(f) {
+    requirePerm("create");
+    if (db.investors.some(i => i.code === f.code)) throw new WorkflowError(`409 · investor code ${f.code} already exists`);
+    const id = Math.max(0, ...db.investors.map(i => i.id)) + 1;
+    db.investors.push({ id, code:f.code.toUpperCase(), legal_name:f.legal_name, short_name:f.short_name,
+      domicile:f.domicile.toUpperCase(), tax_classification:f.tax_classification || null,
+      regulatory_classification:null, primary_contact:null, primary_email:f.primary_email || null,
+      side_letter:!!f.side_letter, status:"active" });
+    session.forms.inv = false;
+    log("investor.create", `investor:${id}`, false);
+    toast(`${f.legal_name} onboarded. Add a commitment to bring them into a fund.`, "info");
+  },
+
+  import(f) {
+    requirePerm("create");
+    const lines = String(f.payload || "").split("\n").map(l => l.trim()).filter(Boolean);
+    const batch = { id:++db.seq.batch, interface_code:f.interface_code, filename:f.filename,
+      rows:lines.length, accepted:0, rejected:0, imported_by:session.user.username,
+      imported_at:nowStamp(), state:"succeeded" };
+    db.batches.push(batch);
+    lines.forEach((line, i) => {
+      const [date, type, ref, code, amount] = line.split(",").map(s => (s || "").trim());
+      const inv = code ? db.investors.find(x => x.code === code) : null;
+      const amt = Number(amount);
+      if (!date || !type || !ref || !Number.isFinite(amt) || amt <= 0) {
+        batch.rejected++;
+        db.exceptions.push({ id:++db.seq.exc, batch_id:batch.id, row_number:i + 1, code:"MALFORMED_ROW",
+          message:`row ${i + 1} could not be parsed into date, type, reference and a positive amount`,
+          owner:null, status:"open", note:null });
+      } else if (code && !inv) {
+        batch.rejected++;
+        db.exceptions.push({ id:++db.seq.exc, batch_id:batch.id, row_number:i + 1, code:"UNKNOWN_INVESTOR",
+          message:`investor code '${code}' does not match any active investor`,
+          owner:null, status:"open", note:null });
+      } else {
+        batch.accepted++;
+        const tx = addTx(db, { date, type, ref, amount:amt, state:"validated",
+          maker:session.user.username, investor_id:inv ? inv.id : null, batch_id:batch.id });
+        link("import→transaction", `batch:${batch.id}`, `transaction:${tx.id}`, 1);
+      }
+    });
+    if (batch.rejected && batch.accepted) batch.state = "partial";
+    else if (batch.rejected) batch.state = "failed";
+    db.jobs.push({ id:++db.seq.job, job_type:"import_transactions", trigger:"manual",
+      status:batch.accepted ? "succeeded" : "failed", started_at:nowStamp(), finished_at:nowStamp(),
+      error:batch.accepted ? null : "every row rejected" });
+    session.forms.lastBatch = batch.id;
+    log("import.run", `batch:${batch.id}`, false);
+    toast(`Batch #${batch.id}: ${batch.accepted} accepted, ${batch.rejected} rejected.`, batch.rejected ? "err" : "");
+  },
+
+  call(f) {
+    requirePerm("create");
+    const total = Number(f.total_amount);
+    if (!(total > 0)) throw new WorkflowError("422 · total_amount must be greater than zero");
+    const unfunded = committed() - contributed();
+    if (total > unfunded) throw new WorkflowError(`409 · call of ${cur(total)} exceeds unfunded commitment of ${cur(unfunded)}`);
+    const c = mkCall(db, f.call_number, f.notice_date, f.due_date, total, f.purpose, session.user.username, null, false);
+    session.forms.call = false;
+    session.forms["call-" + c.id] = true;
+    log("capital_call.create", `capital_call:${c.id}`, false);
+    toast(`${c.call_number} drafted and allocated pro-rata — it needs a different user to approve it.`, "info");
+  },
+
+  dist(f) {
+    requirePerm("create");
+    const total = Number(f.total_amount);
+    if (!(total > 0)) throw new WorkflowError("422 · total_amount must be greater than zero");
+    const d = mkDist(db, f.distribution_number, f.notice_date, f.payment_date, total, f.purpose,
+      !!f.recallable, session.user.username, null, false);
+    session.forms.dist = false;
+    session.forms["dist-" + d.id] = true;
+    log("distribution.create", `distribution:${d.id}`, false);
+    toast(`${d.distribution_number} drafted and allocated pro-rata.`, "info");
+  },
+
+  nav(f) {
+    requirePerm("post");
+    const gav = Number(f.gross_asset_value), liab = Number(f.liabilities);
+    if (liab > gav) throw new WorkflowError("422 · liabilities cannot exceed gross asset value");
+    const n = { id:++db.seq.nav, entity_id:+f.entity_id, as_of:f.as_of, gross_asset_value:gav,
+      liabilities:liab, ending_nav:r2(gav - liab), currency:f.currency.toUpperCase(),
+      source_reference:f.source_reference || null, published_by:session.user.username, published_at:nowStamp() };
+    db.navs.push(n);
+    db.jobs.push({ id:++db.seq.job, job_type:"nav_publish", trigger:"manual", status:"succeeded",
+      started_at:nowStamp(), finished_at:nowStamp(), error:null });
+    log("nav.publish", `nav:${n.id}`, false);
+    toast(`NAV of ${cur(n.ending_nav)} published as of ${n.as_of} — RVPI and TVPI have moved.`);
+  },
+
+  fee(f) {
+    requirePerm("create");
+    const id = Math.max(0, ...db.fee_schedules.map(x => x.id)) + 1;
+    db.fee_schedules.push({ id, entity_id:1, name:f.name, basis:f.basis,
+      annual_rate_bps:+f.annual_rate_bps, periodicity:f.periodicity,
+      effective_from:f.effective_from, effective_to:null, version:1, state:"draft",
+      created_by:session.user.username, approved_by:null });
+    session.forms.fee = false;
+    log("fee_schedule.create", `fee_schedule:${id}`, false);
+    toast(`Fee schedule drafted — it cannot be used in a run until it is approved.`, "info");
+  },
+
+  "fee-run"(f) {
+    requirePerm("create");
+    const sch = db.fee_schedules.find(x => x.id === +f.schedule_id);
+    if (!sch) throw new WorkflowError("404 · no approved fee schedule selected");
+    if (sch.state !== "approved") throw new WorkflowError(`409 · schedule ${sch.id} is ${sch.state}, not approved`);
+    const days = Math.max(1, (new Date(f.end) - new Date(f.start)) / 86400000 + 1);
+    const frac = sch.periodicity === "quarterly" ? 0.25 : sch.periodicity === "monthly" ? 1 / 12 : days / 365;
+    const lines = db.investors.map(i => {
+      const c = db.commitments.find(x => x.investor_id === i.id);
+      const acct = accountFor(i.id);
+      const basis = sch.basis === "commitment" ? c.commitment_amount
+        : sch.basis === "invested_capital" ? acct.contributed
+        : sch.basis === "nav" ? acct.nav : c.commitment_amount;
+      const gross = r2(basis * sch.annual_rate_bps / 10000 * frac);
+      return { investor_id:i.id, basis_amount:basis, rate_bps:sch.annual_rate_bps, gross, offset:0, net:gross };
+    });
+    const run = { id:++db.seq.fee_run, schedule_id:sch.id, schedule_version:sch.version,
+      start:f.start, end:f.end, lines, run_by:session.user.username, run_at:nowStamp(),
+      input_hash:inputHash({ s:sch.id, v:sch.version, a:f.start, b:f.end, l:lines.map(x => x.basis_amount) }) };
+    db.fee_runs.push(run);
+    db.jobs.push({ id:++db.seq.job, job_type:"fee_accrual", trigger:"manual", status:"succeeded",
+      started_at:nowStamp(), finished_at:nowStamp(), error:null });
+    link("fee_schedule→fee_run", `fee_schedule:${sch.id}`, `fee_run:${run.id}`, 1);
+    log("fee_run.execute", `fee_run:${run.id}`, false);
+    toast(`Accrued ${cur2(lines.reduce((a, l) => a + l.net, 0))} across ${lines.length} investors.`);
+  },
+
+  wfm(f) {
+    requirePerm("create");
+    const id = Math.max(0, ...db.wf_models.map(x => x.id)) + 1;
+    db.wf_models.push({ id, entity_id:1, name:f.name, method:f.method,
+      preferred_return_bps:+f.preferred_return_bps, catchup_percentage_bps:+f.catchup_percentage_bps,
+      carried_interest_bps:+f.carried_interest_bps, hurdle_compounding:f.hurdle_compounding,
+      effective_from:f.effective_from, version:1, state:"draft",
+      created_by:session.user.username, approved_by:null });
+    session.forms.wfm = false;
+    log("waterfall_model.create", `waterfall_model:${id}`, false);
+    toast(`Waterfall model drafted — approve it before running carry.`, "info");
+  },
+
+  "wf-run"(f) {
+    requirePerm("create");
+    const m = db.wf_models.find(x => x.id === +f.model_id);
+    if (!m) throw new WorkflowError("404 · no approved waterfall model selected");
+    if (m.state !== "approved") throw new WorkflowError(`409 · model ${m.id} is ${m.state}, not approved`);
+    const first = posted().filter(t => t.transaction_type === "contribution")
+      .map(t => t.transaction_date).sort()[0] || "2022-06-30";
+    const inp = { realised:Number(f.realised), unrealised:Number(f.unrealised),
+      contributions:contributed(), recallable:0, start:first, as_of:f.as_of };
+    const { tiers, years } = computeTiers(m, inp);
+    const run = { id:++db.seq.wf_run, model_id:m.id, model_version:m.version, tiers, years,
+      available:inp.realised + inp.unrealised,
+      lp_total:r2(tiers.reduce((a, t) => a + t.lp, 0)),
+      gp_total:r2(tiers.reduce((a, t) => a + t.gp, 0)),
+      state:"draft", run_by:session.user.username, approved_by:null,
+      scenario_label:f.scenario_label || null, input_hash:inputHash(inp) };
+    db.wf_runs.push(run);
+    db.jobs.push({ id:++db.seq.job, job_type:"waterfall_run", trigger:"manual", status:"succeeded",
+      started_at:nowStamp(), finished_at:nowStamp(), error:null });
+    link("waterfall_model→waterfall_run", `waterfall_model:${m.id}`, `waterfall_run:${run.id}`, 1);
+    log("waterfall_run.execute", `waterfall_run:${run.id}`, false);
+    toast(`Run #${run.id}: ${cur(run.lp_total)} to LPs, ${cur(run.gp_total)} to GP across ${tiers.length} tiers.`);
+  },
+
+  period(f) {
+    requirePerm("create");
+    const dupe = db.periods.find(p => p.start_date === f.start_date && p.end_date === f.end_date && p.period_type === f.period_type);
+    if (dupe) { session.forms.periodId = dupe.id; session.forms.period = false;
+      toast(`Period already exists as #${dupe.id} — ensure is idempotent.`, "info"); return; }
+    const p = mkPeriod(db, f.period_type, f.start_date, f.end_date, "open");
+    session.forms.periodId = p.id;
+    session.forms.period = false;
+    log("period.ensure", `period:${p.id}`, false);
+    toast(`Period #${p.id} opened.`);
+  },
+
+  recon(f) {
+    requirePerm("create");
+    const inRange = posted().filter(t => t.transaction_date >= f.from && t.transaction_date <= f.to);
+    const breaks = db.transactions.filter(t => t.state === "validated" &&
+      t.transaction_date >= f.from && t.transaction_date <= f.to).length;
+    const run = { id:++db.seq.recon, entity_id:+f.entity_id, from:f.from, to:f.to,
+      ledger:inRange.length, feed:inRange.length + breaks, matched:inRange.length, breaks,
+      run_by:session.user.username, run_at:nowStamp() };
+    db.recon_runs.push(run);
+    db.jobs.push({ id:++db.seq.job, job_type:"reconciliation", trigger:"manual", status:"succeeded",
+      started_at:nowStamp(), finished_at:nowStamp(), error:null });
+    log("reconciliation.run", `recon_run:${run.id}`, false);
+    toast(breaks
+      ? `${run.matched} matched, ${breaks} break(s) — unposted activity the feed already shows.`
+      : `${run.matched} records matched, no breaks.`, breaks ? "err" : "");
+  },
+
+  reopen(f) {
+    requirePerm("admin");
+    const p = db.periods.find(x => x.id === +f.id);
+    p.status = "reopened"; p.reopen_reason = f.reason;
+    session.forms["reopen-" + p.id] = false;
+    log("period.reopen", `period:${p.id}`, true);
+    toast("Period reopened — logged against your name as a privileged action.", "info");
+  },
+
+  resolve(f) {
+    requirePerm("edit");
+    const e = db.exceptions.find(x => x.id === +f.id);
+    e.status = "resolved"; e.note = f.note;
+    session.forms["resolve-" + e.id] = false;
+    log("exception.resolve", `exception:${e.id}`, false);
+    toast(`Exception #${e.id} resolved.`);
+  },
+
+  user(f) {
+    requirePerm("admin");
+    if (db.users.some(u => u.username === f.username)) throw new WorkflowError(`409 · username ${f.username} is taken`);
+    const roles = [].concat(f.roles || []).filter(Boolean);
+    if (!roles.length) throw new WorkflowError("422 · a user needs at least one role");
+    const id = ++db.seq.user;
+    db.users.push({ id, username:f.username, display_name:f.display_name, email:f.email,
+      roles, mfa:!!f.mfa, active:true });
+    session.forms.user = false;
+    log("user.create", `user:${id}`, true);
+    toast(`${f.username} provisioned with ${roles.length} role(s). Sign in as them to see their view.`, "info");
+  },
+};
+</script>
+<script>
+"use strict";
+/* ===================== event wiring ================================= */
+document.addEventListener("click", ev => {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.tagName === "SELECT" || el.disabled) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (!ACTIONS[act]) return;
+  if (el.tagName === "A") ev.preventDefault();
+  session.banner = null;
+  try {
+    const r = ACTIONS[act](id);
+    if (r === "skip") return;
+  } catch (e) {
+    fail(e);
+    toast(e instanceof WorkflowError ? e.message : "Something went wrong.", "err");
+  }
+  render();
+});
+
+document.addEventListener("change", ev => {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.tagName !== "SELECT") return;
+  if (el.dataset.act === "tx-filter") session.forms.txState = el.value;
+  if (el.dataset.act === "report-pick") session.forms.report = el.value;
+  render();
+});
+
+document.addEventListener("input", ev => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.act === "audit-q") {
+    session.forms.auditQ = el.value;
+    const at = el.selectionStart;
+    render();
+    const again = document.querySelector('[data-act="audit-q"]');
+    if (again) { again.focus(); again.setSelectionRange(at, at); }
+  }
+});
+
+document.addEventListener("submit", ev => {
+  const form = ev.target.closest("[data-form]");
+  if (!form) return;
+  ev.preventDefault();
+  const name = form.dataset.form;
+  if (!FORMS[name]) return;
+  const fd = new FormData(form);
+  const data = {};
+  for (const [k, v] of fd.entries()) {
+    if (k in data) data[k] = [].concat(data[k], v);
+    else data[k] = v;
+  }
+  session.banner = null;
+  try {
+    if (FORMS[name](data) === "handled") return;
+  } catch (e) {
+    fail(e);
+    toast(e instanceof WorkflowError ? e.message : "Something went wrong.", "err");
+  }
+  render();
+});
+
+/* ===================== boot ========================================= */
+function syncRoute() {
+  const h = location.hash.replace(/^#/, "") || "/";
+  session.route = h.startsWith("/") ? h : "/";
+  session.banner = null;
+  render();
+  const main = document.querySelector("main");
+  if (main) main.scrollTop = 0;
+}
+window.addEventListener("hashchange", syncRoute);
+
+restore();
+if (session.user) {
+  // Re-derive roles from the store, in case the user record changed.
+  const u = db.users.find(x => x.username === session.user.username && x.active);
+  session.user = u ? { username:u.username, roles:u.roles.slice() } : null;
+}
+syncRoute();
+</script>
