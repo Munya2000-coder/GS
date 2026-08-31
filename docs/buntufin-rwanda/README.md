@@ -50,10 +50,11 @@ raised as a URS change request (with impact assessment, per URS §1) or removed.
 | `BFR-STD-007` | [04-standards/BFR-STD-007-localisation-ussd-accessibility.md](04-standards/BFR-STD-007-localisation-ussd-accessibility.md) | Localisation, USSD, accessibility (URS §18–20) | — |
 | `BFR-STD-008` | [04-standards/BFR-STD-008-security-monitoring-bcp.md](04-standards/BFR-STD-008-security-monitoring-bcp.md) | Security monitoring, BCP, backup, environments, CI/CD (URS §21–25) | — |
 | `BFR-STD-009` | [04-standards/BFR-STD-009-test-strategy.md](04-standards/BFR-STD-009-test-strategy.md) | Test categories and evidence standard (URS §26) | Step 13 |
-| `BFR-FDS-nn` | [05-fds/](05-fds/) | **Functional Design Specification** — 30 domain files, one design block per requirement | Steps 2–6 |
+| `BFR-FDS-01…30` | [05-fds/](05-fds/) | **Functional Design Specification** — 30 domain files, one design block per requirement | Steps 2–6 |
 | `BFR-BKL-001` | [06-backlog/BFR-BKL-001-epic-feature-map.md](06-backlog/BFR-BKL-001-epic-feature-map.md) | Epic → feature → story rollup and release sequencing | Step 6 |
 | `BFR-RTM-001` | [07-traceability/BFR-RTM-001-traceability-matrix.md](07-traceability/BFR-RTM-001-traceability-matrix.md) | Requirements traceability matrix (URS §27) | Step 5 / 14 |
-| — | [07-traceability/rtm.csv](07-traceability/rtm.csv) | Machine-readable RTM, one row per requirement | Step 5 / 14 |
+| — | [07-traceability/rtm.csv](07-traceability/rtm.csv) | Machine-readable RTM, 1,382 rows (one per requirement × test case) | Step 5 / 14 |
+| — | [07-traceability/generate_rtm.py](07-traceability/generate_rtm.py) | RTM generator and CI traceability gate | Step 5 / 14 |
 | `BFR-REL-001` | [08-release/BFR-REL-001-sandbox-release-gates.md](08-release/BFR-REL-001-sandbox-release-gates.md) | Sandbox release gate evidence pack (URS §29) | Step 15 |
 
 ---
@@ -85,7 +86,32 @@ leaving the repository.
 
 ---
 
-## 4. Status and what is deliberately *not* here
+## 4. What the baseline contains
+
+| | |
+|---|---:|
+| URS requirements covered | **300 / 300** |
+| Domains | 30 |
+| Functional design blocks | 300 (exactly one per requirement) |
+| Business rules specified | 1,240 |
+| Exception cases specified | 401 |
+| Epics / features / user stories | 30 / 121 / 300 |
+| Test cases specified | 1,382 |
+| Open questions raised | 28 (11 blocking, 7 parameterised, 10 contract-pending) |
+| Sandbox release gates | 16 |
+
+Verify at any time:
+
+```bash
+python3 docs/buntufin-rwanda/07-traceability/generate_rtm.py --check
+```
+
+This regenerates `rtm.csv` and fails if any requirement lacks a design block, a
+user story or (for P1) a test case — the CI traceability gate for `BFR-NFR-010`.
+
+---
+
+## 5. Status and what is deliberately *not* here
 
 This baseline covers **Steps 1–6 and the standing standards** of URS §30
 (analyse, architecture, data model, bounded domains, traceability, backlog).

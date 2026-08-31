@@ -211,3 +211,25 @@ pipeline, fee accrual math & reproducibility, American & European waterfalls,
 IRR/TVPI/DPI, capital-call pro-rata allocation, distribution payout,
 period lifecycle, close-step dependencies, NAV publishing, UI rendering,
 CSV export, seed data, and audit/lineage traversal.
+
+---
+
+## BuntuFin Rwanda programme documentation
+
+This repository also carries the controlled documentation baseline for the
+**BuntuFin Rwanda Financial Inclusion Platform** (URS `BFR-URS-001`, 300
+requirements), under [`docs/buntufin-rwanda/`](docs/buntufin-rwanda/).
+
+It is a separate programme from the GS Private Capital Suite above and shares
+no code with it. Start at
+[`docs/buntufin-rwanda/README.md`](docs/buntufin-rwanda/README.md).
+
+**Binding rule for that programme:** no functionality may be created — in code,
+database, API, UI or test — without referencing its originating `BFR-xxx-nnn`
+requirement ID.
+
+Verify traceability at any time:
+
+```bash
+python3 docs/buntufin-rwanda/07-traceability/generate_rtm.py --check
+```
