@@ -243,7 +243,7 @@
 **Events** — `transaction.imported`
 **Audit** — access to raw payloads audited.
 
-**Story `US-OF-008x`** *(traces `BFR-OF-006`)* — As a lender receiving a Passport, I want each figure traceable to its source, so that I can rely on it.
+**Story `US-OF-006`** — As a lender receiving a Passport, I want each figure traceable to its source, so that I can rely on it.
 *Given* a Passport metric, *when* I inspect it, *then* I can see which institutions and which retrieval times contributed.
 
 **Tests**
